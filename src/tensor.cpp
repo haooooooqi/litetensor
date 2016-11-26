@@ -98,6 +98,8 @@ void SequentialTensor::fill_tensor(std::ifstream& infile) {
 }
 
 void SequentialTensor::fill_tensor_c(FILE* fp) {
+  nnz_ = 0;
+
   uint64_t i, j, k;
   double val;
   char* line = NULL;
@@ -105,7 +107,6 @@ void SequentialTensor::fill_tensor_c(FILE* fp) {
   size_t len = 0;
   char* ptr = NULL;
 
-  rewind(fp);     // Point to file head
   while ((read = getline(&line, &len, fp)) != -1) {
     ptr = line;
     i = strtoull(ptr, &ptr, 10) - 1;
@@ -115,6 +116,8 @@ void SequentialTensor::fill_tensor_c(FILE* fp) {
     k = strtoull(ptr, &ptr, 10) - 1;
     ptr ++;
     val = strtod(ptr, &ptr);
+
+    nnz_ ++;
 
     frob_norm_ += val * val;
     // Push indices and values
@@ -144,14 +147,21 @@ void SequentialTensor::get_dim(std::ifstream& infile) {
 }
 
 void SequentialTensor::get_dim_c(FILE* fp) {
-  nnz_ = 0; I_ = 0; J_ = 0; K_ = 0;
+  I_ = 0; J_ = 0; K_ = 0;
 
-  uint64_t i, j, k;
   char* line = NULL;
   ssize_t read;
   size_t len = 0;
   char* ptr = NULL;
 
+  if ((read = getline(&line, &len, fp)) != -1) {
+      I_ = strtoull(line, &ptr, 10);
+      ptr ++;
+      J_ = strtoull(ptr, &ptr, 10);
+      ptr ++;
+      K_ = strtoull(ptr, &ptr, 10);
+  }
+  /*
   rewind(fp);     // Point to file head
   while ((read = getline(&line, &len, fp)) != -1) {
     // ptr = line;
@@ -167,7 +177,7 @@ void SequentialTensor::get_dim_c(FILE* fp) {
     K_ = std::max(K_, k);
     nnz_ ++;
   }
-
+  */
 }
 
 }
