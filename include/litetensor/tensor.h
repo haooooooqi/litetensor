@@ -5,7 +5,6 @@
 #include <fstream>
 #include <vector>
 
-
 namespace litetensor {
 
 /*
@@ -28,14 +27,20 @@ private:
   // Print out tensor statistics
   void print_tensor_stats();
 
+  // Read the file
+  void read_file(std::string tensor_file);
+  void read_file_c(std::string tensor_file);
+
   // Traverse the file and get the dimension
   void get_dim(std::ifstream& infile);
+  void get_dim_c(FILE* fp);
 
   // Allocate space for tensor
   void allocate_tensor();
 
   // Fill the tensor
   void fill_tensor(std::ifstream& infile);
+  void fill_tensor_c(FILE* fp);
 
 };
 

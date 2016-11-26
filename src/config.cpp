@@ -12,7 +12,7 @@ namespace litetensor {
 Config::Config(int argc, char** argv) {
   // Default value
   rank = 10;
-  max_iters = 10;
+  max_iters = 5;
   num_threads = 1;
   tolerance = 1e-5;
 

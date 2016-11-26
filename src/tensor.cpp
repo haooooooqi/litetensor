@@ -1,8 +1,16 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #include <litetensor/tensor.h>
 
 namespace litetensor {
 
 SequentialTensor::SequentialTensor(std::string tensor_file) {
+  read_file_c(tensor_file);
+  print_tensor_stats();
+}
+
+void SequentialTensor::read_file(std::string tensor_file) {
   using namespace std;
 
   ifstream infile;
@@ -18,11 +26,23 @@ SequentialTensor::SequentialTensor(std::string tensor_file) {
   infile.seekg(0);
 
   fill_tensor(infile);
-
   infile.close();
+}
 
-  // Show tensor statistics
-  print_tensor_stats();
+void SequentialTensor::read_file_c(std::string tensor_file) {
+  using namespace std;
+
+  FILE* fp = fopen(tensor_file.c_str(), "r");
+  if (!fp)
+    cout << "ERROR: can't open tensor file" << endl;
+
+  get_dim_c(fp);
+  allocate_tensor();
+  fill_tensor_c(fp);
+
+  int close = fclose(fp);
+  if (close != 0)
+    cout << "ERROR: can't close tensor file" << endl;
 }
 
 
@@ -77,6 +97,36 @@ void SequentialTensor::fill_tensor(std::ifstream& infile) {
   }
 }
 
+void SequentialTensor::fill_tensor_c(FILE* fp) {
+  uint64_t i, j, k;
+  double val;
+  char* line = NULL;
+  ssize_t read;
+  size_t len = 0;
+  char* ptr = NULL;
+
+  rewind(fp);     // Point to file head
+  while ((read = getline(&line, &len, fp)) != -1) {
+    ptr = line;
+    i = strtoull(ptr, &ptr, 10) - 1;
+    ptr ++;
+    j = strtoull(ptr, &ptr, 10) - 1;
+    ptr ++;
+    k = strtoull(ptr, &ptr, 10) - 1;
+    ptr ++;
+    val = strtod(ptr, &ptr);
+
+    frob_norm_ += val * val;
+    // Push indices and values
+    indices_[0][i].push_back(k * J_ + j);
+    indices_[1][j].push_back(k * I_ + i);
+    indices_[2][k].push_back(j * I_ + i);
+    vals_[0][i].push_back(val);
+    vals_[1][j].push_back(val);
+    vals_[2][k].push_back(val);
+  }
+}
+
 void SequentialTensor::get_dim(std::ifstream& infile) {
   using namespace std;
 
@@ -93,5 +143,31 @@ void SequentialTensor::get_dim(std::ifstream& infile) {
   }
 }
 
+void SequentialTensor::get_dim_c(FILE* fp) {
+  nnz_ = 0; I_ = 0; J_ = 0; K_ = 0;
+
+  uint64_t i, j, k;
+  char* line = NULL;
+  ssize_t read;
+  size_t len = 0;
+  char* ptr = NULL;
+
+  rewind(fp);     // Point to file head
+  while ((read = getline(&line, &len, fp)) != -1) {
+    // ptr = line;
+    i = strtoull(line, &ptr, 10);
+    ptr ++;
+    j = strtoull(ptr, &ptr, 10);
+    ptr ++;
+    k = strtoull(ptr, &ptr, 10);
+    ptr ++;
+
+    I_ = std::max(I_, i);
+    J_ = std::max(J_, j);
+    K_ = std::max(K_, k);
+    nnz_ ++;
+  }
+
+}
 
 }

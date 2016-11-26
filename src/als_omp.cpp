@@ -23,7 +23,7 @@ void OMPALSSolver::mttkrp_MA(SequentialTensor& tensor, Mat& MA, Mat& C, Mat& B,
   // Initialize MA to 0s, very important
   MA.setZero();
 
-  #pragma omp parallel for num_threads(num_threads_)
+  #pragma omp parallel for schedule(dynamic, 16) num_threads(num_threads_)
   for (uint64_t i = 0; i < I_; i++) {   // Each row of MA(i, :)
     for (uint64_t idx = 0; idx < tensor.indices_[mode][i].size(); idx++) {
       uint64_t j = tensor.indices_[mode][i][idx] % J_;
@@ -55,7 +55,7 @@ void OMPALSSolver::mttkrp_MC(SequentialTensor& tensor, Mat& MC, Mat& B, Mat& A,
                              uint64_t mode) {
   MC.setZero();
 
-  #pragma omp parallel for num_threads(num_threads_)
+  #pragma omp parallel for schedule(dynamic, 2) num_threads(num_threads_)
   for (uint64_t k = 0; k < K_; k++) {
     for (uint64_t idx = 0; idx < tensor.indices_[mode][k].size(); idx++) {
       uint64_t i = tensor.indices_[mode][k][idx] % I_;
@@ -235,5 +235,3 @@ double OMPALSSolver::calc_fitness(Mat& ATA, Mat& BTB, Mat& CTC,
 }
 
 }
-
-
