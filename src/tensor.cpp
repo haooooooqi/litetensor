@@ -17,7 +17,7 @@ void SequentialTensor::read_file(std::string tensor_file) {
   infile.open(tensor_file);
 
   if (!infile.is_open())
-    cout << "ERROR: can't open tensor file" << endl;
+    cout << "ERROR: can't open tensor file" << "\n";
 
   get_dim(infile);
   allocate_tensor();
@@ -34,7 +34,7 @@ void SequentialTensor::read_file_c(std::string tensor_file) {
 
   FILE* fp = fopen(tensor_file.c_str(), "r");
   if (!fp)
-    cout << "ERROR: can't open tensor file" << endl;
+    cout << "ERROR: can't open tensor file" << "\n";
 
   get_dim_c(fp);
   allocate_tensor();
@@ -42,16 +42,16 @@ void SequentialTensor::read_file_c(std::string tensor_file) {
 
   int close = fclose(fp);
   if (close != 0)
-    cout << "ERROR: can't close tensor file" << endl;
+    cout << "ERROR: can't close tensor file" << "\n";
 }
 
 
 void SequentialTensor::print_tensor_stats() {
   using namespace std;
 
-  cout << "=============== Tensor statistics ===============" << endl;
+  cout << "=============== Tensor statistics ===============" << "\n";
   cout << "Shape: " << I_ << "x" << J_ << "x" << K_ << "; ";
-  cout << "Non-zeros: " << nnz_ << endl << endl;
+  cout << "Non-zeros: " << nnz_ << "\n";
 }
 
 
@@ -77,7 +77,7 @@ void SequentialTensor::fill_tensor(std::ifstream& infile) {
   frob_norm_ = 0.0;
 
   if (!infile.is_open())
-    cout << "ERROR: can't open tensor file" << endl;
+    cout << "ERROR: can't open tensor file" << "\n";
 
   uint64_t i, j, k;
   double val;

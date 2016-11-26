@@ -19,6 +19,7 @@ int main(int argc, char** argv) {
   high_resolution_clock::time_point init_start = Clock::now();
   SequentialTensor tensor(config.tensor_file);
   double init_time = duration_cast<dsec>(Clock::now() - init_start).count();
+  cout << "Initialization time: " << init_time << " seconds" << "\n\n";
 
   OMPALSSolver solver(tensor, config.rank, config.num_threads);
 
@@ -27,11 +28,10 @@ int main(int argc, char** argv) {
   double compute_time =
           duration_cast<dsec>(Clock::now() - compute_start).count();
 
-  cout << endl;
-  cout << "================ Time Statistics ================" << endl;
-  cout << "Initialization time: " << init_time << " seconds" << endl;
-  cout << "Computation time: " << compute_time << " seconds" << endl;
-  cout << "Total time: " << compute_time + init_time << " seconds" << endl;
+  cout << "\n";
+  cout << "================ Time Statistics ================" << "\n";
+  cout << "Computation time: " << compute_time << " seconds" << "\n";
+  cout << "Total time: " << compute_time + init_time << " seconds" << "\n";
 
 //  solver.check_correctness(tensor);
 
