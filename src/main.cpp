@@ -3,9 +3,8 @@
 
 #include <litetensor/tensor.h>
 #include <litetensor/config.h>
-#include <litetensor/als_sequential.h>
+#include <litetensor/factor_omp.h>
 #include <litetensor/als_omp.h>
-
 
 int main(int argc, char** argv) {
   using namespace std;
@@ -17,14 +16,14 @@ int main(int argc, char** argv) {
   Config config(argc, argv);
 
   high_resolution_clock::time_point init_start = Clock::now();
-  SequentialTensor tensor(config.tensor_file);
+  RawTensor tensor(config.tensor_file);
   double init_time = duration_cast<dsec>(Clock::now() - init_start).count();
   cout << "Initialization time: " << init_time << " seconds" << "\n\n";
 
-  OMPALSSolver solver(tensor, config.rank, config.num_threads);
+  OMPALSSolver solver;
 
   high_resolution_clock::time_point compute_start = Clock::now();
-  solver.decompose(tensor, config.max_iters, config.tolerance);
+  solver.decompose(tensor, config);
   double compute_time =
           duration_cast<dsec>(Clock::now() - compute_start).count();
 
@@ -32,8 +31,6 @@ int main(int argc, char** argv) {
   cout << "================ Time Statistics ================" << "\n";
   cout << "Computation time: " << compute_time << " seconds" << "\n";
   cout << "Total time: " << compute_time + init_time << " seconds" << "\n";
-
-//  solver.check_correctness(tensor);
 
   return 0;
 }

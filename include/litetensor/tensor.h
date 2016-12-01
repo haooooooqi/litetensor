@@ -8,20 +8,20 @@
 namespace litetensor {
 
 /*
- * Tensor format for sequential ALS. Store slices for each mode.
+ * Tensor format for single node shared address ALS. Store slices for each mode.
  * For each slice, we store the indices and vals
  */
-class SequentialTensor {
+struct RawTensor {
 public:
-  uint64_t I_, J_, K_;
-  uint64_t nnz_;
-  std::vector<std::vector<std::vector<uint64_t>>> indices_;   // Indices
-  std::vector<std::vector<std::vector<double>>> vals_;     // Values
+  uint64_t I, J, K;
+  uint64_t nnz;
+  std::vector<std::vector<std::vector<uint64_t>>> indices;   // Indices
+  std::vector<std::vector<std::vector<double>>> vals;     // Values
 
   // Frobenius norm
-  double frob_norm_;
+  double frob_norm;
 
-  SequentialTensor(std::string tensor_file);
+  RawTensor(std::string tensor_file);
 
 private:
   // Print out tensor statistics

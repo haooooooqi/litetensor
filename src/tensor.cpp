@@ -5,12 +5,12 @@
 
 namespace litetensor {
 
-SequentialTensor::SequentialTensor(std::string tensor_file) {
+RawTensor::RawTensor(std::string tensor_file) {
   read_file_c(tensor_file);
   print_tensor_stats();
 }
 
-void SequentialTensor::read_file(std::string tensor_file) {
+void RawTensor::read_file(std::string tensor_file) {
   using namespace std;
 
   ifstream infile;
@@ -29,7 +29,7 @@ void SequentialTensor::read_file(std::string tensor_file) {
   infile.close();
 }
 
-void SequentialTensor::read_file_c(std::string tensor_file) {
+void RawTensor::read_file_c(std::string tensor_file) {
   using namespace std;
 
   FILE* fp = fopen(tensor_file.c_str(), "r");
@@ -46,35 +46,35 @@ void SequentialTensor::read_file_c(std::string tensor_file) {
 }
 
 
-void SequentialTensor::print_tensor_stats() {
+void RawTensor::print_tensor_stats() {
   using namespace std;
 
   cout << "=============== Tensor statistics ===============" << "\n";
-  cout << "Shape: " << I_ << "x" << J_ << "x" << K_ << "; ";
-  cout << "Non-zeros: " << nnz_ << "\n";
+  cout << "Shape: " << I << "x" << J << "x" << K << "; ";
+  cout << "Non-zeros: " << nnz << "\n";
 }
 
 
-void SequentialTensor::allocate_tensor() {
+void RawTensor::allocate_tensor() {
   using namespace std;
 
-  indices_ = vector<vector<vector<uint64_t>>>(3, vector<vector<uint64_t>>());
-  indices_[0] = vector<vector<uint64_t>>(I_, vector<uint64_t>());
-  indices_[1] = vector<vector<uint64_t>>(J_, vector<uint64_t>());
-  indices_[2] = vector<vector<uint64_t>>(K_, vector<uint64_t>());
+  indices = vector<vector<vector<uint64_t>>>(3, vector<vector<uint64_t>>());
+  indices[0] = vector<vector<uint64_t>>(I, vector<uint64_t>());
+  indices[1] = vector<vector<uint64_t>>(J, vector<uint64_t>());
+  indices[2] = vector<vector<uint64_t>>(K, vector<uint64_t>());
 
-  vals_ = vector<vector<vector<double>>>(3, vector<vector<double>>());
-  vals_[0] = vector<vector<double>>(I_, vector<double>());
-  vals_[1] = vector<vector<double>>(J_, vector<double>());
-  vals_[2] = vector<vector<double>>(K_, vector<double>());
+  vals = vector<vector<vector<double>>>(3, vector<vector<double>>());
+  vals[0] = vector<vector<double>>(I, vector<double>());
+  vals[1] = vector<vector<double>>(J, vector<double>());
+  vals[2] = vector<vector<double>>(K, vector<double>());
 }
 
 
-void SequentialTensor::fill_tensor(std::ifstream& infile) {
+void RawTensor::fill_tensor(std::ifstream& infile) {
   using namespace std;
 
   // Calculate frobenius norm
-  frob_norm_ = 0.0;
+  frob_norm = 0.0;
 
   if (!infile.is_open())
     cout << "ERROR: can't open tensor file" << "\n";
@@ -85,19 +85,19 @@ void SequentialTensor::fill_tensor(std::ifstream& infile) {
   while ((infile >> i >> c >> j >> c >> k >> c >> val) && (c == ',')) {
     i--; j--; k--;
 
-    frob_norm_ += val * val;
+    frob_norm += val * val;
 
     // Push indices and values
-    indices_[0][i].push_back(k * J_ + j);
-    indices_[1][j].push_back(k * I_ + i);
-    indices_[2][k].push_back(j * I_ + i);
-    vals_[0][i].push_back(val);
-    vals_[1][j].push_back(val);
-    vals_[2][k].push_back(val);
+    indices[0][i].push_back(k * J + j);
+    indices[1][j].push_back(k * I + i);
+    indices[2][k].push_back(j * I + i);
+    vals[0][i].push_back(val);
+    vals[1][j].push_back(val);
+    vals[2][k].push_back(val);
   }
 }
 
-void SequentialTensor::fill_tensor_c(FILE* fp) {
+void RawTensor::fill_tensor_c(FILE* fp) {
   uint64_t i, j, k;
   double val;
   char* line = NULL;
@@ -116,35 +116,35 @@ void SequentialTensor::fill_tensor_c(FILE* fp) {
     ptr ++;
     val = strtod(ptr, &ptr);
 
-    frob_norm_ += val * val;
+    frob_norm += val * val;
     // Push indices and values
-    indices_[0][i].push_back(k * J_ + j);
-    indices_[1][j].push_back(k * I_ + i);
-    indices_[2][k].push_back(j * I_ + i);
-    vals_[0][i].push_back(val);
-    vals_[1][j].push_back(val);
-    vals_[2][k].push_back(val);
+    indices[0][i].push_back(k * J + j);
+    indices[1][j].push_back(k * I + i);
+    indices[2][k].push_back(j * I + i);
+    vals[0][i].push_back(val);
+    vals[1][j].push_back(val);
+    vals[2][k].push_back(val);
   }
 }
 
-void SequentialTensor::get_dim(std::ifstream& infile) {
+void RawTensor::get_dim(std::ifstream& infile) {
   using namespace std;
 
-  nnz_ = 0; I_ = 0; J_ = 0; K_ = 0;
+  nnz = 0; I = 0; J = 0; K = 0;
 
   uint64_t i, j, k;
   double val;
   char c;
   while ((infile >> i >> c >> j >> c >> k >> c >> val) && (c == ',')) {
-    I_ = max(I_, i);
-    J_ = max(J_, j);
-    K_ = max(K_, k);
-    nnz_ ++;
+    I = max(I, i);
+    J = max(J, j);
+    K = max(K, k);
+    nnz ++;
   }
 }
 
-void SequentialTensor::get_dim_c(FILE* fp) {
-  nnz_ = 0; I_ = 0; J_ = 0; K_ = 0;
+void RawTensor::get_dim_c(FILE* fp) {
+  nnz = 0; I = 0; J = 0; K = 0;
 
   uint64_t i, j, k;
   char* line = NULL;
@@ -154,11 +154,11 @@ void SequentialTensor::get_dim_c(FILE* fp) {
 
 /*
   if ((read = getline(&line, &len, fp)) != -1) {
-      I_ = strtoull(line, &ptr, 10);
+      I = strtoull(line, &ptr, 10);
       ptr ++;
-      J_ = strtoull(ptr, &ptr, 10);
+      J = strtoull(ptr, &ptr, 10);
       ptr ++;
-      K_ = strtoull(ptr, &ptr, 10);
+      K = strtoull(ptr, &ptr, 10);
   }
   */
   rewind(fp);     // Point to file head
@@ -171,10 +171,10 @@ void SequentialTensor::get_dim_c(FILE* fp) {
     k = strtoull(ptr, &ptr, 10);
     ptr ++;
 
-    I_ = std::max(I_, i);
-    J_ = std::max(J_, j);
-    K_ = std::max(K_, k);
-    nnz_ ++;
+    I = std::max(I, i);
+    J = std::max(J, j);
+    K = std::max(K, k);
+    nnz ++;
   }
 }
 

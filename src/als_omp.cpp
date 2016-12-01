@@ -8,147 +8,154 @@
 
 namespace litetensor {
 
-void OMPALSSolver::copy_params(SequentialTensor& tensor) {
-  frob_norm_ = tensor.frob_norm_;
-  frob_norm_sq_ = sqrt(frob_norm_);
+/*
+void OMPALSSolver::copy_params(RawTensor& tensor) {
+  frob_norm = tensor.frob_norm;
+  frob_norm_sq = sqrt(frob_norm);
 
-  I_ = tensor.I_;
-  J_ = tensor.J_;
-  K_ = tensor.K_;
+  I = tensor.I;
+  J = tensor.J;
+  K = tensor.K;
 }
+*/
 
 // MTTKRP for mode 1
-void OMPALSSolver::mttkrp_MA(SequentialTensor& tensor, Mat& MA, Mat& C, Mat& B,
-                             uint64_t mode) {
+void OMPALSSolver::mttkrp_MA(RawTensor& tensor, Factor& factor, uint64_t mode) {
   // Initialize MA to 0s, very important
-  MA.setZero();
+  factor.MA.setZero();
 
-  #pragma omp parallel for schedule(dynamic, 16) num_threads(num_threads_)
-  for (uint64_t i = 0; i < I_; i++) {   // Each row of MA(i, :)
-    for (uint64_t idx = 0; idx < tensor.indices_[mode][i].size(); idx++) {
-      uint64_t j = tensor.indices_[mode][i][idx] % J_;
-      uint64_t k = tensor.indices_[mode][i][idx] / J_;
-      MA.row(i) += tensor.vals_[mode][i][idx] *
-                   (B.row(j).cwiseProduct(C.row(k)));
+  #pragma omp parallel for schedule(dynamic, 16) num_threads(factor.num_threads)
+  for (uint64_t i = 0; i < tensor.I; i++) {   // Each row of MA(i, :)
+    for (uint64_t idx = 0; idx < tensor.indices[mode][i].size(); idx++) {
+      uint64_t j = tensor.indices[mode][i][idx] % tensor.J;
+      uint64_t k = tensor.indices[mode][i][idx] / tensor.J;
+      factor.MA.row(i) += tensor.vals[mode][i][idx] *
+              (factor.B.row(j).cwiseProduct(factor.C.row(k)));
     }
   }
 }
 
 // MTTKRP for mode 2
-void OMPALSSolver::mttkrp_MB(SequentialTensor& tensor, Mat& MB, Mat& C, Mat& A,
-                             uint64_t mode) {
-  MB.setZero();
+void OMPALSSolver::mttkrp_MB(RawTensor& tensor, Factor& factor, uint64_t mode) {
+  factor.MB.setZero();
 
-  #pragma omp parallel for schedule(dynamic, 16) num_threads(num_threads_)
-  for (uint64_t j = 0; j < J_; j++) {
-    for (uint64_t idx = 0; idx < tensor.indices_[mode][j].size(); idx++) {
-      uint64_t i = tensor.indices_[mode][j][idx] % I_;
-      uint64_t k = tensor.indices_[mode][j][idx] / I_;
-      MB.row(j) += tensor.vals_[mode][j][idx] *
-                   (C.row(k).cwiseProduct(A.row(i)));
+  #pragma omp parallel for schedule(dynamic, 16) num_threads(factor.num_threads)
+  for (uint64_t j = 0; j < tensor.J; j++) {
+    for (uint64_t idx = 0; idx < tensor.indices[mode][j].size(); idx++) {
+      uint64_t i = tensor.indices[mode][j][idx] % tensor.I;
+      uint64_t k = tensor.indices[mode][j][idx] / tensor.I;
+      factor.MB.row(j) += tensor.vals[mode][j][idx] *
+              (factor.C.row(k).cwiseProduct(factor.A.row(i)));
     }
   }
 }
 
 // MTTKRP for mode 3
-void OMPALSSolver::mttkrp_MC(SequentialTensor& tensor, Mat& MC, Mat& B, Mat& A,
-                             uint64_t mode) {
-  MC.setZero();
+void OMPALSSolver::mttkrp_MC(RawTensor& tensor, Factor& factor, uint64_t mode) {
+  factor.MC.setZero();
 
-  #pragma omp parallel for schedule(dynamic, 2) num_threads(num_threads_)
-  for (uint64_t k = 0; k < K_; k++) {
-    for (uint64_t idx = 0; idx < tensor.indices_[mode][k].size(); idx++) {
-      uint64_t i = tensor.indices_[mode][k][idx] % I_;
-      uint64_t j = tensor.indices_[mode][k][idx] / I_;
-      MC.row(k) += tensor.vals_[mode][k][idx] *
-                   (B.row(j).cwiseProduct(A.row(i)));
+  #pragma omp parallel for schedule(dynamic, 2) num_threads(factor.num_threads)
+  for (uint64_t k = 0; k < tensor.K; k++) {
+    for (uint64_t idx = 0; idx < tensor.indices[mode][k].size(); idx++) {
+      uint64_t i = tensor.indices[mode][k][idx] % tensor.I;
+      uint64_t j = tensor.indices[mode][k][idx] / tensor.I;
+      factor.MC.row(k) += tensor.vals[mode][k][idx] *
+              (factor.B.row(j).cwiseProduct(factor.A.row(i)));
     }
   }
 }
 
-void OMPALSSolver::normalize(Mat& M, int iter) {
+
+void OMPALSSolver::normalize(Factor& factor, Mat& M, int iter) {
+  uint64_t rank = factor.rank;
+
   if (iter == 0) {   // L2 norm in the first iteration
-    for (uint64_t r = 0; r < rank_; r++)
+    for (uint64_t r = 0; r < rank; r++)
       M.col(r).normalize();
   } else {           // Max norm for later iterations
-    for (uint64_t r = 0; r < rank_; r++) {
-      lambda_(r) = std::max(M.col(r).maxCoeff(), 1.0);
-      M.col(r) /= lambda_(r);
+    for (uint64_t r = 0; r < rank; r++) {
+      factor.lambda(r) = std::max(M.col(r).maxCoeff(), 1.0);
+      M.col(r) /= factor.lambda(r);
     }
   }
 }
 
 
-void OMPALSSolver::als_iter(SequentialTensor& tensor, Mat& V, int iter) {
+void OMPALSSolver::als_iter(RawTensor& tensor, Factor& factor, Mat& V,
+                            int iter) {
   using namespace std::chrono;
   typedef std::chrono::high_resolution_clock Clock;
   typedef std::chrono::duration<double> dsec;
 
   // Update A
   high_resolution_clock::time_point iter_start = Clock::now();
-  V = (BTB_.cwiseProduct(CTC_).llt().solve(ID_));
+  V = (factor.BTB.cwiseProduct(factor.CTC).llt().solve(factor.ID));
   double iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   std::cout << "Inverse A time: " << iter_time << " seconds; ";
 
   iter_start = Clock::now();
-  mttkrp_MA(tensor, MA_, C_, B_, 0);
+  mttkrp_MA(tensor, factor, 0);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   std::cout << "MTTKRP A time: " << iter_time << " seconds" << std::endl;
 
-  A_ = MA_ * V;
-  normalize(A_, iter);
-  ATA_ = A_.transpose() * A_;
+  factor.A = factor.MA * V;
+  normalize(factor, factor.A, iter);
+  factor.ATA = factor.A.transpose() * factor.A;
 
   // Update B
   iter_start = Clock::now();
-  V = (ATA_.cwiseProduct(CTC_).llt().solve(ID_));
+  V = (factor.ATA.cwiseProduct(factor.CTC).llt().solve(factor.ID));
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   std::cout << "Inverse B time: " << iter_time << " seconds; ";
 
   iter_start = Clock::now();
-  mttkrp_MB(tensor, MB_, C_, A_, 1);
+  mttkrp_MB(tensor, factor, 1);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   std::cout << "MTTKRP B time: " << iter_time << " seconds" << std::endl;
 
-  B_ = MB_ * V;
-  normalize(B_, iter);
-  BTB_ = B_.transpose() * B_;
+  factor.B = factor.MB * V;
+  normalize(factor, factor.B, iter);
+  factor.BTB = factor.B.transpose() * factor.B;
 
   // Update C
   iter_start = Clock::now();
-  V = (ATA_.cwiseProduct(BTB_).llt().solve(ID_));
+  V = (factor.ATA.cwiseProduct(factor.BTB).llt().solve(factor.ID));
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   std::cout << "Inverse C time: " << iter_time << " seconds; ";
 
   iter_start = Clock::now();
-  mttkrp_MC(tensor, MC_, B_, A_, 2);
+  mttkrp_MC(tensor, factor, 2);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   std::cout << "MTTKRP C time: " << iter_time << " seconds" << std::endl;
 
-  C_ = MC_ * V;
-  normalize(C_, iter);
-  CTC_ = C_.transpose() * C_;
+  factor.C = factor.MC * V;
+  normalize(factor, factor.C, iter);
+  factor.CTC = factor.C.transpose() * factor.C;
 }
 
 
-void OMPALSSolver::als(SequentialTensor& tensor, int max_iters,
-                              double tolerance) {
+void OMPALSSolver::als(RawTensor& tensor, Factor& factor, Config& config) {
   using namespace Eigen;
   using namespace std;
   using namespace std::chrono;
   typedef std::chrono::high_resolution_clock Clock;
   typedef std::chrono::duration<double> dsec;
 
+  uint64_t rank = config.rank;
+  int num_threads = config.num_threads;
+  int max_iters = config.max_iters;
+  double tolerance = config.tolerance;
+
   cout << "=============== Decomposing Tensor ==============" << endl;
-  cout << "Max iterations: " << max_iters << "; " <<  "Rank: " << rank_ << "; ";
+  cout << "Max iterations: " << max_iters << "; " <<  "Rank: " << rank << "; ";
   cout << "Tolerance: " << tolerance << "; ";
-  cout << "Number of threads: " << num_threads_ << endl;
+  cout << "Number of threads: " << num_threads << endl;
 
-  ATA_ = A_.transpose() * A_;
-  BTB_ = B_.transpose() * B_;
-  CTC_ = C_.transpose() * C_;
+  factor.ATA = factor.A.transpose() * factor.A;
+  factor.BTB = factor.B.transpose() * factor.B;
+  factor.CTC = factor.C.transpose() * factor.C;
 
-  Mat V = MatrixXd(rank_, rank_);
+  Mat V = MatrixXd(rank, rank);
 
   double prev_fitness = 1;
   double fitness = 0;
@@ -157,11 +164,11 @@ void OMPALSSolver::als(SequentialTensor& tensor, int max_iters,
 
   for (int iter = 0; iter < max_iters; iter++) {
     iter_start = Clock::now();
-    als_iter(tensor, V, iter);
+    als_iter(tensor, factor, V, iter);
     iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
 
     // Check fitness
-    fitness = calc_fitness(ATA_, BTB_, CTC_, MC_, C_);
+    fitness = calc_fitness(factor);
     cout << "Time: " << iter_time << ", ";
     cout << "Iteration: " << iter + 1 << ", Fitness: " << fitness << endl;
 
@@ -174,64 +181,35 @@ void OMPALSSolver::als(SequentialTensor& tensor, int max_iters,
 }
 
 
-void OMPALSSolver::decompose(SequentialTensor& tensor, int max_iter
-        , double tolerance) {
-  als(tensor, max_iter, tolerance);
+void OMPALSSolver::decompose(RawTensor& tensor, Config& config) {
+  Factor factor(tensor, config);
+  als(tensor, factor, config);
 }
 
 
-OMPALSSolver::OMPALSSolver(SequentialTensor& tensor, uint64_t rank,
-                           int num_threads):
-        rank_(rank), num_threads_(num_threads) {
-  using namespace std;
-  using namespace Eigen;
-
-  copy_params(tensor);
-
-  // Allocate space
-  A_ = MatrixXd::Random(I_, rank_);
-  B_ = MatrixXd::Random(J_, rank_);
-  C_ = MatrixXd::Random(K_, rank_);
-  lambda_ = VectorXd(rank_);
-
-  ones_ = VectorXd(K_).setOnes();
-
-  ATA_ = MatrixXd(rank_, rank_);
-  BTB_ = MatrixXd(rank_, rank_);
-  CTC_ = MatrixXd(rank_, rank_);
-
-  ID_ = MatrixXd(rank_, rank_).setIdentity();
-
-  MA_ = MatrixXd(I_, rank_);
-  MB_ = MatrixXd(J_, rank_);
-  MC_ = MatrixXd(K_, rank_);
-}
-
-
-double OMPALSSolver::calc_kruskal_norm(Mat& ATA, Mat& BTB, Mat& CTC) {
-  Mat tmp = ATA.cwiseProduct(BTB).cwiseProduct(CTC);
-  Mat res = lambda_.transpose() * tmp * lambda_;
+double OMPALSSolver::calc_kruskal_norm(Factor& factor) {
+  Mat tmp = factor.ATA.cwiseProduct(factor.BTB).cwiseProduct(factor.CTC);
+  Mat res = factor.lambda.transpose() * tmp * factor.lambda;
   return *res.data();
 }
 
-double OMPALSSolver::calc_kruskal_inner(Mat& MC, Mat& C) {
-  Mat tmp = MC.cwiseProduct(C);
-  Mat res = ones_.transpose() * tmp * lambda_;
+double OMPALSSolver::calc_kruskal_inner(Factor& factor) {
+  Mat tmp = factor.MC.cwiseProduct(factor.C);
+  Mat res = factor.ones.transpose() * tmp * factor.lambda;
   return *res.data();
 }
 
 
-double OMPALSSolver::calc_fitness(Mat& ATA, Mat& BTB, Mat& CTC,
-                                         Mat& MC, Mat& C) {
-  double kruskal_norm = calc_kruskal_norm(ATA, BTB, CTC);
-  double kruskal_inner = calc_kruskal_inner(MC, C);
+double OMPALSSolver::calc_fitness(Factor& factor) {
+  double kruskal_norm = calc_kruskal_norm(factor);
+  double kruskal_inner = calc_kruskal_inner(factor);
 
-  double residual = frob_norm_ + kruskal_norm - (2 * kruskal_inner);
+  double residual = factor.frob_norm + kruskal_norm - (2 * kruskal_inner);
 
   if (residual > 0.0)
     residual = sqrt(residual);
 
-  return 1 - (residual / frob_norm_sq_);
+  return 1 - (residual / factor.frob_norm_sq);
 }
 
 }
