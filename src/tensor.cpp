@@ -152,15 +152,6 @@ void RawTensor::get_dim_c(FILE* fp) {
   size_t len = 0;
   char* ptr = NULL;
 
-/*
-  if ((read = getline(&line, &len, fp)) != -1) {
-      I = strtoull(line, &ptr, 10);
-      ptr ++;
-      J = strtoull(ptr, &ptr, 10);
-      ptr ++;
-      K = strtoull(ptr, &ptr, 10);
-  }
-  */
   rewind(fp);     // Point to file head
   while ((read = getline(&line, &len, fp)) != -1) {
     // ptr = line;
@@ -171,9 +162,9 @@ void RawTensor::get_dim_c(FILE* fp) {
     k = strtoull(ptr, &ptr, 10);
     ptr ++;
 
-    I = std::max(I, i);
-    J = std::max(J, j);
-    K = std::max(K, k);
+    I = std::max(i, I);
+    J = std::max(j, J);
+    K = std::max(k, K);
     nnz ++;
   }
 }

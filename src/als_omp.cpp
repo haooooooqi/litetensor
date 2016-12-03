@@ -8,17 +8,6 @@
 
 namespace litetensor {
 
-/*
-void OMPALSSolver::copy_params(RawTensor& tensor) {
-  frob_norm = tensor.frob_norm;
-  frob_norm_sq = sqrt(frob_norm);
-
-  I = tensor.I;
-  J = tensor.J;
-  K = tensor.K;
-}
-*/
-
 // MTTKRP for mode 1
 void OMPALSSolver::mttkrp_MA(RawTensor& tensor, Factor& factor, uint64_t mode) {
   // Initialize MA to 0s, very important

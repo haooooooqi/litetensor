@@ -9,26 +9,6 @@ namespace litetensor {
 
 class OMPALSSolver {
 private:
-  /*
-  uint64_t I, J, K;
-  uint64_t rank;
-  int num_threads;
-
-  Mat A, B, C;         // Shapes: A = (I, R), B = (J, R), C = (K, R)
-  Mat MA, MB, MC;
-  Mat ATA, BTB, CTC;   // Shape: (R, R)
-  Mat ID;                // Identity matrix
-
-  Vec lambda;
-  Vec ones;              // length = K
-
-  // Parameters to track fitness
-  double frob_norm;
-  double frob_norm_sq;
-  */
-
-  // Copy parameters from tensor
-  // void copy_params(RawTensor& tensor);
 
   /*
    * Conduct matricized tensor times Khatri-Rao product (MTTKRP)

@@ -17,6 +17,10 @@ public:
   int num_threads;
   double tolerance;
 
+  // Options for MPI
+  bool use_mpi;
+  int num_procs;
+
   Config(int argc, char** argv);
 
 };
