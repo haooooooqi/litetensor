@@ -1,3 +1,6 @@
+#include <mpi.h>
+#include <math.h>
+
 #include <iomanip>
 
 #include <litetensor/tensor_mpi_coarse.h>
@@ -30,7 +33,7 @@ void Partitioner::print_tensor_stats() {
 }
 
 
-Partitioner::Partitioner(Config& config) {
+void Partitioner::partition(Config& config) {
   using namespace std;
 
   FILE* fp = fopen(config.tensor_file.c_str(), "r");
@@ -50,9 +53,6 @@ Partitioner::Partitioner(Config& config) {
   // Check correctness in partition
   check_partition();
   print_tensor_stats();
-
-  // Send partition info to each process
-
 
   // Close file
   int close = fclose(fp);
@@ -211,7 +211,152 @@ void Partitioner::get_dim(FILE* fp) {
 /*
  * Methods of CoarseTensor class
  */
+void CoarseTensor::scatter_partition(Partitioner &partitioner, Config &config) {
+  using namespace std;
 
+  MPI_Comm_rank(MPI_COMM_WORLD, &proc_id);
+  num_procs = config.num_procs;
+
+  if (proc_id == 0) { // Prepare for parameters
+    I = partitioner.I;
+    J = partitioner.J;
+    K = partitioner.K;
+  }
+
+  // Scatter shape info
+  MPI_Bcast(&I, 1, MPI_INT64_T, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&J, 1, MPI_INT64_T, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&K, 1, MPI_INT64_T, 0, MPI_COMM_WORLD);
+
+  /*
+  cout << "From process " << proc_id << " Received I is " << I << "\n";
+  cout << "From process " << proc_id << " Received J is " << J << "\n";
+  cout << "From process " << proc_id << " Received K is " << K << "\n";
+   */
+
+  // Scatter row ranges
+  start_rows = vector<uint64_t>(3);
+  end_rows = vector<uint64_t>(3);
+  num_rows = vector<uint64_t>(3);
+
+  uint64_t* global_start_ptr = nullptr;
+  uint64_t* global_end_ptr = nullptr;
+
+  for (int m = 0; m < 3; m++) {
+    if (proc_id == 0) {
+      global_start_ptr = &partitioner.start_indices[m][0];
+      global_end_ptr = &partitioner.end_indices[m][0];
+    }
+
+    MPI_Scatter(global_start_ptr, 1, MPI_INT64_T, &start_rows[m],
+                1, MPI_INT64_T, 0, MPI_COMM_WORLD);
+    MPI_Scatter(global_end_ptr, 1, MPI_INT64_T, &end_rows[m],
+                1, MPI_INT64_T, 0, MPI_COMM_WORLD);
+
+    num_rows[m] = end_rows[m] - start_rows[m];
+
+    /*
+    cout << "From process " << proc_id << " Mode " << m;
+    cout << " Start: " << start_rows[m] << " End: " << end_rows[m];
+    cout << "\n";
+     */
+  }
+
+  // Scatter counts and displacements
+  counts = vector<vector<int>> (3, vector<int>(num_procs));
+  disps = vector<vector<int>> (3, vector<int>(num_procs));
+
+  if (proc_id == 0) {
+    for (int m = 0; m < 3; m++) {
+      for (int i = 0; i < num_procs; i++) {
+        counts[m][i] = (int) config.rank *
+                (partitioner.end_indices[m][i] - partitioner.end_indices[m][i]);
+        disps[m][i] = (int) config.rank * partitioner.start_indices[m][i];
+      }
+    }
+  }
+
+  for (int m = 0; m < 3; m++) {
+    MPI_Bcast(&counts[m].front(), num_procs, MPI_INT64_T, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&disps[m].front(), num_procs, MPI_INT64_T, 0, MPI_COMM_WORLD);
+
+    cout << "From process " << proc_id << " Mode " << m;
+    cout << " Counts: " << counts[m][proc_id] << " Disps: ";
+    cout << disps[m][proc_id] << "\n";
+  }
+
+}
+
+
+void CoarseTensor::fill_tensor(Config &config) {
+  using namespace std;
+
+  FILE* fp = fopen(config.tensor_file.c_str(), "r");
+  if (!fp)
+    cout << "ERROR: can't open tensor file" << "\n";
+
+  // Allocate memory
+  indices = vector<vector<vector<uint64_t>>>(3, vector<vector<uint64_t>>());
+  vals = vector<vector<vector<double>>>(3, vector<vector<double>>());
+
+  for (int m = 0; m < 3; m++) {
+    indices[m] = vector<vector<uint64_t>>(end_rows[m] - start_rows[m],
+                                          vector<uint64_t>());
+    vals[m] = vector<vector<double>>(I, vector<double>());
+  }
+
+  // Parse file
+  uint64_t i, j, k;
+  double val;
+  char* line = NULL;
+  ssize_t read;
+  size_t len = 0;
+  char* ptr = NULL;
+
+  rewind(fp);     // Point to file head
+  while ((read = getline(&line, &len, fp)) != -1) {
+    ptr = line;
+    i = strtoull(ptr, &ptr, 10) - 1;       // 0-based index
+    ptr ++;
+    j = strtoull(ptr, &ptr, 10) - 1;
+    ptr ++;
+    k = strtoull(ptr, &ptr, 10) - 1;
+    ptr ++;
+    val = strtod(ptr, &ptr);
+
+    frob_norm += val * val;
+
+    // Push indices and values if in range
+    // WARNING
+    if (i < end_rows[0] && i >= start_rows[0]) {
+      indices[0][i-start_rows[0]].push_back(k * J + j);
+      vals[0][i-start_rows[0]].push_back(val);
+    }
+
+    if (j < end_rows[1] && j >= start_rows[1]) {
+      indices[1][j-start_rows[1]].push_back(k * I + i);
+      vals[1][j-start_rows[1]].push_back(val);
+    }
+
+    if (k < end_rows[2] && k >= start_rows[2]) {
+      indices[2][k-start_rows[2]].push_back(j * I + i);
+      vals[2][i-start_rows[2]].push_back(val);
+    }
+  }
+
+  frob_norm_sq = sqrt(frob_norm);
+
+  // Close file
+  int close = fclose(fp);
+  if (close != 0)
+    cout << "ERROR: can't close tensor file" << "\n";
+}
+
+
+void CoarseTensor::construct_tensor(Partitioner &partitioner, Config &config) {
+  scatter_partition(partitioner, config);
+  fill_tensor(config);
+}
 
 
 }   // litetensor

@@ -13,7 +13,6 @@ bool startswith(const std::string str, const std::string s);
 std::vector<std::string> split(const std::string str,
                                const char separator);
 
-
 }
 
 }
