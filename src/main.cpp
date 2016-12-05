@@ -19,23 +19,19 @@ int main(int argc, char** argv) {
   Config config(argc, argv);
 
   if (config.use_mpi) {     // MPI code
-    int num_procs;          // Number of processes
     int proc_id;            // Process ID
-
     MPI_Init(&argc, &argv);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &proc_id);
-    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+    MPI_Comm_size(MPI_COMM_WORLD, &config.num_procs);
 
     Partitioner partitioner;
     CoarseTensor tensor;
 
     // Master node will read tensor, partition tensor to chunk of rows,
     // and send rows to each node
-    if (proc_id == 0) {
-      config.num_procs = num_procs;
+    if (proc_id == 0)
       partitioner.partition(config);
-    }
 
     tensor.construct_tensor(partitioner, config);
     CoarseMPIALSSolver solver;
@@ -44,7 +40,7 @@ int main(int argc, char** argv) {
     MPI_Finalize();
 
   } else {              // Single node, shared address model
-    
+
     high_resolution_clock::time_point init_start = Clock::now();
     RawTensor tensor(config.tensor_file);
     double init_time = duration_cast<dsec>(Clock::now() - init_start).count();

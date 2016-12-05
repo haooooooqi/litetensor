@@ -8,7 +8,8 @@
 namespace litetensor {
 
 // For simplicity, alias for Eigen matrix and vector type
-typedef Eigen::MatrixXd Mat;
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+        Mat;
 typedef Eigen::VectorXd Vec;
 
 }

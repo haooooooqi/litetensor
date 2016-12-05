@@ -174,7 +174,6 @@ bool Partitioner::check_partition() {
 
   }
 
-
   return true;
 }
 
@@ -258,6 +257,7 @@ void CoarseTensor::scatter_partition(Partitioner &partitioner, Config &config) {
     /*
     cout << "From process " << proc_id << " Mode " << m;
     cout << " Start: " << start_rows[m] << " End: " << end_rows[m];
+    cout << " Number of rows: " << num_rows[m];
     cout << "\n";
      */
   }
@@ -269,21 +269,34 @@ void CoarseTensor::scatter_partition(Partitioner &partitioner, Config &config) {
   if (proc_id == 0) {
     for (int m = 0; m < 3; m++) {
       for (int i = 0; i < num_procs; i++) {
-        counts[m][i] = (int) config.rank *
-                (partitioner.end_indices[m][i] - partitioner.end_indices[m][i]);
+        counts[m][i] = (int) config.rank * (partitioner.end_indices[m][i] -
+                partitioner.start_indices[m][i]);
         disps[m][i] = (int) config.rank * partitioner.start_indices[m][i];
       }
     }
   }
 
   for (int m = 0; m < 3; m++) {
-    MPI_Bcast(&counts[m].front(), num_procs, MPI_INT64_T, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&disps[m].front(), num_procs, MPI_INT64_T, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&counts[m][0], num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&disps[m][0], num_procs, MPI_INT, 0, MPI_COMM_WORLD);
+  }
+
+  // Check counts
+  /*
+  for (int m = 0; m < 3; m++) {
+    cout << "From process " << proc_id << " Mode " << m;
+    cout << " Counts: ";
+    for (int i = 0; i < num_procs; i++)
+      cout << counts[m][i] / config.rank << " ";
+    cout << "\n";
 
     cout << "From process " << proc_id << " Mode " << m;
-    cout << " Counts: " << counts[m][proc_id] << " Disps: ";
-    cout << disps[m][proc_id] << "\n";
+    cout << " Disps: ";
+    for (int i = 0; i < num_procs; i++)
+      cout << disps[m][i] / config.rank << " ";
+    cout << "\n";
   }
+   */
 
 }
 
@@ -300,9 +313,8 @@ void CoarseTensor::fill_tensor(Config &config) {
   vals = vector<vector<vector<double>>>(3, vector<vector<double>>());
 
   for (int m = 0; m < 3; m++) {
-    indices[m] = vector<vector<uint64_t>>(end_rows[m] - start_rows[m],
-                                          vector<uint64_t>());
-    vals[m] = vector<vector<double>>(I, vector<double>());
+    indices[m] = vector<vector<uint64_t>>(num_rows[m], vector<uint64_t>());
+    vals[m] = vector<vector<double>>(num_rows[m], vector<double>());
   }
 
   // Parse file
@@ -340,7 +352,7 @@ void CoarseTensor::fill_tensor(Config &config) {
 
     if (k < end_rows[2] && k >= start_rows[2]) {
       indices[2][k-start_rows[2]].push_back(j * I + i);
-      vals[2][i-start_rows[2]].push_back(val);
+      vals[2][k-start_rows[2]].push_back(val);
     }
   }
 

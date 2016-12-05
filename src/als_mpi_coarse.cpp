@@ -39,6 +39,15 @@ void CoarseMPIALSSolver::als(CoarseTensor& tensor, CoarseFactor& factor,
   factor.BTB = factor.B.transpose() * factor.B;
   factor.CTC = factor.C.transpose() * factor.C;
 
+  /*
+  if (proc_id == 0) {
+    cout << "Process " << tensor.proc_id << " initial A, B, C:\n";
+    cout << "A: \n" << factor.A << endl;
+    cout << "B: \n" << factor.B << endl;
+    cout << "C: \n" << factor.C << endl;
+  }
+   */
+
   // Intermediate result of pseudo-inverse, a small dense matrix
   Mat V = MatrixXd(rank, rank);
 
@@ -56,7 +65,8 @@ void CoarseMPIALSSolver::als(CoarseTensor& tensor, CoarseFactor& factor,
     // Master node checks fitness
     fitness = calc_fitness(factor);
 
-    cout << "From process " << proc_id;
+    cout << "From process " << proc_id << " ";
+    cout << "Fitness: " << fitness << "; ";
     cout << "Iteration time: " << iter_time << "\n";
 
     if (proc_id == 0)
@@ -79,21 +89,18 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   typedef std::chrono::high_resolution_clock Clock;
   typedef std::chrono::duration<double> dsec;
 
-  // TODO: modify to MPI
-
   int proc_id = tensor.proc_id;
 
+  high_resolution_clock::time_point iter_start;
+  double iter_time;
+
   // Update A
-  high_resolution_clock::time_point iter_start = Clock::now();
   V = (factor.BTB.cwiseProduct(factor.CTC).llt().solve(factor.ID));
-  double iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "From process " << proc_id;
-  cout << "Inverse A time: " << iter_time << " seconds; ";
 
   iter_start = Clock::now();
   mttkrp_MA(tensor, factor, 0);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "From process " << proc_id;
+  cout << "From process " << proc_id << " ";
   cout << "MTTKRP A time: " << iter_time << " seconds" << std::endl;
 
   // Allgatherv on MA
@@ -102,21 +109,16 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
                  &tensor.disps[0].front(), MPI_DOUBLE, MPI_COMM_WORLD);
 
   factor.A = factor.A * V;
-
   normalize(factor, factor.A, iter);
   factor.ATA = factor.A.transpose() * factor.A;
 
   // Update B
-  iter_start = Clock::now();
   V = (factor.ATA.cwiseProduct(factor.CTC).llt().solve(factor.ID));
-  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "From process " << proc_id;
-  cout << "Inverse B time: " << iter_time << " seconds; ";
 
   iter_start = Clock::now();
   mttkrp_MB(tensor, factor, 1);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "From process " << proc_id;
+  cout << "From process " << proc_id << " ";
   cout << "MTTKRP B time: " << iter_time << " seconds" << std::endl;
 
   // Allgatherv on MB
@@ -125,22 +127,18 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
                  &tensor.disps[1].front(), MPI_DOUBLE, MPI_COMM_WORLD);
 
   factor.B = factor.B * V;
-
   normalize(factor, factor.B, iter);
   factor.BTB = factor.B.transpose() * factor.B;
 
   // Update C
-  iter_start = Clock::now();
   V = (factor.ATA.cwiseProduct(factor.BTB).llt().solve(factor.ID));
-  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "From process " << proc_id;
-  cout << "Inverse C time: " << iter_time << " seconds; ";
 
   iter_start = Clock::now();
   mttkrp_MC(tensor, factor, 2);
+
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "From process " << proc_id;
-  cout << "MTTKRP C time: " << iter_time << " seconds" << std::endl;
+  cout << "From process " << proc_id << " ";
+  cout << "MTTKRP C time: " << iter_time << " seconds" << endl;
 
   // Allgatherv on MC
   MPI_Allgatherv(factor.MC.data(), tensor.counts[2][proc_id], MPI_DOUBLE,
@@ -152,10 +150,8 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
             factor.MC_copy.data());
 
   factor.C = factor.C * V;
-
   normalize(factor, factor.C, iter);
   factor.CTC = factor.C.transpose() * factor.C;
-
 }
 
 
@@ -201,11 +197,14 @@ void CoarseMPIALSSolver::mttkrp_MC(CoarseTensor& tensor, CoarseFactor& factor,
     for (uint64_t idx = 0; idx < tensor.indices[mode][k].size(); idx++) {
       uint64_t i = tensor.indices[mode][k][idx] % tensor.I;
       uint64_t j = tensor.indices[mode][k][idx] / tensor.I;
+
       factor.MC.row(k) += tensor.vals[mode][k][idx] *
               (factor.B.row(j).cwiseProduct(factor.A.row(i)));
     }
   }
+
 }
+
 
 
 // Mat M: A/B/C

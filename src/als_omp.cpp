@@ -91,6 +91,8 @@ void OMPALSSolver::als_iter(RawTensor& tensor, Factor& factor, Mat& V,
   normalize(factor, factor.A, iter);
   factor.ATA = factor.A.transpose() * factor.A;
 
+//  std::cout << "A:\n" <<  factor.A << "\n";
+
   // Update B
   iter_start = Clock::now();
   V = (factor.ATA.cwiseProduct(factor.CTC).llt().solve(factor.ID));
@@ -106,6 +108,8 @@ void OMPALSSolver::als_iter(RawTensor& tensor, Factor& factor, Mat& V,
   normalize(factor, factor.B, iter);
   factor.BTB = factor.B.transpose() * factor.B;
 
+//  std::cout << "B:\n" <<  factor.B << "\n";
+
   // Update C
   iter_start = Clock::now();
   V = (factor.ATA.cwiseProduct(factor.BTB).llt().solve(factor.ID));
@@ -120,6 +124,8 @@ void OMPALSSolver::als_iter(RawTensor& tensor, Factor& factor, Mat& V,
   factor.C = factor.MC * V;
   normalize(factor, factor.C, iter);
   factor.CTC = factor.C.transpose() * factor.C;
+
+//  std::cout << "C:\n" <<  factor.C << "\n";
 }
 
 
@@ -143,6 +149,13 @@ void OMPALSSolver::als(RawTensor& tensor, Factor& factor, Config& config) {
   factor.ATA = factor.A.transpose() * factor.A;
   factor.BTB = factor.B.transpose() * factor.B;
   factor.CTC = factor.C.transpose() * factor.C;
+
+  /*
+  cout << "Initial A, B, C\n";
+  cout << "A: \n" << factor.A << endl;
+  cout << "B: \n" << factor.B << endl;
+  cout << "C: \n" << factor.C << endl;
+   */
 
   Mat V = MatrixXd(rank, rank);
 
