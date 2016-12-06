@@ -30,7 +30,8 @@ void CoarseMPIALSSolver::als(CoarseTensor& tensor, CoarseFactor& factor,
   int proc_id = tensor.proc_id;
 
   if (proc_id == 0) {
-    cout << "\n=============== Decomposing Tensor ==============\n";
+    cout << "\n";
+    cout << "====================== Decomposing Tensor =====================\n";
     cout << "Max iterations: " << max_iters << "; " << "Rank: " << rank << "; ";
     cout << "Tolerance: " << tolerance << ";\n";
   }

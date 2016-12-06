@@ -92,11 +92,18 @@ void OMPALSSolver::als_iter(RawTensor& tensor, Factor& factor, Mat& V,
 
   iter_start = Clock::now();
   factor.A = factor.MA * V;
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Update time: " << setw(width) << iter_time << " seconds; ";
+
+  iter_start = Clock::now();
   normalize(factor, factor.A, iter);
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Normalize time: " << setw(width) << iter_time << " seconds; ";
+
+  iter_start = Clock::now();
   factor.ATA = factor.A.transpose() * factor.A;
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Update and normalize time: " << setw(width) << iter_time;
-  cout << " seconds\n";
+  cout << "ATA time: " << setw(width) << iter_time << " seconds;\n";
 
   // Update B
   V = (factor.ATA.cwiseProduct(factor.CTC).llt().solve(factor.ID));
@@ -108,11 +115,18 @@ void OMPALSSolver::als_iter(RawTensor& tensor, Factor& factor, Mat& V,
 
   iter_start = Clock::now();
   factor.B = factor.MB * V;
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Update time: " << setw(width) << iter_time << " seconds; ";
+
+  iter_start = Clock::now();
   normalize(factor, factor.B, iter);
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Normalize time: " << setw(width) << iter_time << " seconds; ";
+
+  iter_start = Clock::now();
   factor.BTB = factor.B.transpose() * factor.B;
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Update and normalize time: " << setw(width) << iter_time;
-  cout << " seconds\n";
+  cout << "BTB time: " << setw(width) << iter_time << " seconds;\n";
 
   // Update C
   V = (factor.ATA.cwiseProduct(factor.BTB).llt().solve(factor.ID));
@@ -124,11 +138,18 @@ void OMPALSSolver::als_iter(RawTensor& tensor, Factor& factor, Mat& V,
 
   iter_start = Clock::now();
   factor.C = factor.MC * V;
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Update time: " << setw(width) << iter_time << " seconds; ";
+
+  iter_start = Clock::now();
   normalize(factor, factor.C, iter);
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Normalize time: " << setw(width) << iter_time << " seconds; ";
+
+  iter_start = Clock::now();
   factor.CTC = factor.C.transpose() * factor.C;
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Update and normalize time: " << setw(width) << iter_time;
-  cout << " seconds\n";
+  cout << "CTC time: " << setw(width) << iter_time << " seconds;\n";
 }
 
 
@@ -191,7 +212,9 @@ void OMPALSSolver::decompose(RawTensor& tensor, Config& config) {
   als(tensor, factor, config);
 }
 
-
+/*
+ * Fitness functions
+ */
 double OMPALSSolver::calc_kruskal_norm(Factor& factor) {
   Mat tmp = factor.ATA.cwiseProduct(factor.BTB).cwiseProduct(factor.CTC);
   Mat res = factor.lambda.transpose() * tmp * factor.lambda;
@@ -217,4 +240,4 @@ double OMPALSSolver::calc_fitness(Factor& factor) {
   return 1 - (residual / factor.frob_norm_sq);
 }
 
-}
+}  // namespace litetensor
