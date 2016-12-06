@@ -40,11 +40,14 @@ int main(int argc, char** argv) {
     MPI_Finalize();
 
   } else {              // Single node, shared address model
-
     high_resolution_clock::time_point init_start = Clock::now();
     RawTensor tensor(config.tensor_file);
     double init_time = duration_cast<dsec>(Clock::now() - init_start).count();
     cout << "Initialization time: " << init_time << " seconds" << "\n\n";
+
+    // Set thread number
+    omp_set_num_threads(config.num_threads);
+    Eigen::setNbThreads(config.num_threads);
 
     OMPALSSolver solver;
 

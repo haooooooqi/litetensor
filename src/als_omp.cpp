@@ -14,7 +14,7 @@ void OMPALSSolver::mttkrp_MA(RawTensor& tensor, Factor& factor, uint64_t mode) {
   // Initialize MA to 0s, very important
   factor.MA.setZero();
 
-  #pragma omp parallel for schedule(dynamic, 16) num_threads(factor.num_threads)
+  #pragma omp parallel for schedule(dynamic, 16)
   for (uint64_t i = 0; i < tensor.I; i++) {   // Each row of MA(i, :)
     for (uint64_t idx = 0; idx < tensor.indices[mode][i].size(); idx++) {
       uint64_t j = tensor.indices[mode][i][idx] % tensor.J;
@@ -29,7 +29,7 @@ void OMPALSSolver::mttkrp_MA(RawTensor& tensor, Factor& factor, uint64_t mode) {
 void OMPALSSolver::mttkrp_MB(RawTensor& tensor, Factor& factor, uint64_t mode) {
   factor.MB.setZero();
 
-  #pragma omp parallel for schedule(dynamic, 16) num_threads(factor.num_threads)
+  #pragma omp parallel for schedule(dynamic, 16)
   for (uint64_t j = 0; j < tensor.J; j++) {
     for (uint64_t idx = 0; idx < tensor.indices[mode][j].size(); idx++) {
       uint64_t i = tensor.indices[mode][j][idx] % tensor.I;
@@ -44,7 +44,7 @@ void OMPALSSolver::mttkrp_MB(RawTensor& tensor, Factor& factor, uint64_t mode) {
 void OMPALSSolver::mttkrp_MC(RawTensor& tensor, Factor& factor, uint64_t mode) {
   factor.MC.setZero();
 
-  #pragma omp parallel for schedule(dynamic, 2) num_threads(factor.num_threads)
+  #pragma omp parallel for schedule(dynamic, 4)
   for (uint64_t k = 0; k < tensor.K; k++) {
     for (uint64_t idx = 0; idx < tensor.indices[mode][k].size(); idx++) {
       uint64_t i = tensor.indices[mode][k][idx] % tensor.I;
@@ -60,8 +60,9 @@ void OMPALSSolver::normalize(Factor& factor, Mat& M, int iter) {
   uint64_t rank = factor.rank;
 
   if (iter == 0) {   // L2 norm in the first iteration
-    for (uint64_t r = 0; r < rank; r++)
-      M.col(r).normalize();
+//    for (uint64_t r = 0; r < rank; r++)
+//      M.col(r).normalize();
+    M.colwise().normalize();
   } else {           // Max norm for later iterations
     for (uint64_t r = 0; r < rank; r++) {
       factor.lambda(r) = std::max(M.col(r).maxCoeff(), 1.0);
