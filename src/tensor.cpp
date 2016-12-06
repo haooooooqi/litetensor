@@ -49,7 +49,7 @@ void RawTensor::read_file_c(std::string tensor_file) {
 void RawTensor::print_tensor_stats() {
   using namespace std;
 
-  cout << "=============== Tensor statistics ===============" << "\n";
+  cout << "====================== Tensor statistics =======================\n";
   cout << "Shape: " << I << "x" << J << "x" << K << "; ";
   cout << "Non-zeros: " << nnz << "\n";
 }

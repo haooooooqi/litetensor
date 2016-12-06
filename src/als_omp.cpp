@@ -2,6 +2,7 @@
 #include <omp.h>
 
 #include <chrono>
+#include <iomanip>
 
 #include <litetensor/tensor.h>
 #include <litetensor/als_omp.h>
@@ -72,60 +73,62 @@ void OMPALSSolver::normalize(Factor& factor, Mat& M, int iter) {
 
 void OMPALSSolver::als_iter(RawTensor& tensor, Factor& factor, Mat& V,
                             int iter) {
+  using namespace std;
   using namespace std::chrono;
   typedef std::chrono::high_resolution_clock Clock;
   typedef std::chrono::duration<double> dsec;
 
+  high_resolution_clock::time_point iter_start;
+  double iter_time;
+  int width = 8;
+
   // Update A
-  high_resolution_clock::time_point iter_start = Clock::now();
   V = (factor.BTB.cwiseProduct(factor.CTC).llt().solve(factor.ID));
-  double iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  std::cout << "Inverse A time: " << iter_time << " seconds; ";
 
   iter_start = Clock::now();
   mttkrp_MA(tensor, factor, 0);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  std::cout << "MTTKRP A time: " << iter_time << " seconds" << std::endl;
+  cout << "A MTTKRP time: " << setw(width) << iter_time << " seconds; ";
 
+  iter_start = Clock::now();
   factor.A = factor.MA * V;
   normalize(factor, factor.A, iter);
   factor.ATA = factor.A.transpose() * factor.A;
-
-//  std::cout << "A:\n" <<  factor.A << "\n";
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Update and normalize time: " << setw(width) << iter_time;
+  cout << " seconds\n";
 
   // Update B
-  iter_start = Clock::now();
   V = (factor.ATA.cwiseProduct(factor.CTC).llt().solve(factor.ID));
-  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  std::cout << "Inverse B time: " << iter_time << " seconds; ";
 
   iter_start = Clock::now();
   mttkrp_MB(tensor, factor, 1);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  std::cout << "MTTKRP B time: " << iter_time << " seconds" << std::endl;
+  std::cout << "B MTTKRP time: " << setw(width) << iter_time << " seconds; ";
 
+  iter_start = Clock::now();
   factor.B = factor.MB * V;
   normalize(factor, factor.B, iter);
   factor.BTB = factor.B.transpose() * factor.B;
-
-//  std::cout << "B:\n" <<  factor.B << "\n";
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Update and normalize time: " << setw(width) << iter_time;
+  cout << " seconds\n";
 
   // Update C
-  iter_start = Clock::now();
   V = (factor.ATA.cwiseProduct(factor.BTB).llt().solve(factor.ID));
-  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  std::cout << "Inverse C time: " << iter_time << " seconds; ";
 
   iter_start = Clock::now();
   mttkrp_MC(tensor, factor, 2);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  std::cout << "MTTKRP C time: " << iter_time << " seconds" << std::endl;
+  cout << "C MTTKRP time: " << setw(width) << iter_time << " seconds; ";
 
+  iter_start = Clock::now();
   factor.C = factor.MC * V;
   normalize(factor, factor.C, iter);
   factor.CTC = factor.C.transpose() * factor.C;
-
-//  std::cout << "C:\n" <<  factor.C << "\n";
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Update and normalize time: " << setw(width) << iter_time;
+  cout << " seconds\n";
 }
 
 
@@ -141,7 +144,7 @@ void OMPALSSolver::als(RawTensor& tensor, Factor& factor, Config& config) {
   int max_iters = config.max_iters;
   double tolerance = config.tolerance;
 
-  cout << "=============== Decomposing Tensor ==============" << endl;
+  cout << "====================== Decomposing Tensor ======================\n";
   cout << "Max iterations: " << max_iters << "; " <<  "Rank: " << rank << "; ";
   cout << "Tolerance: " << tolerance << "; ";
   cout << "Number of threads: " << num_threads << endl;

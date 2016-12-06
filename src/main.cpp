@@ -53,7 +53,8 @@ int main(int argc, char** argv) {
     double compute_time =
             duration_cast<dsec>(Clock::now() - compute_start).count();
 
-    cout << "\n================ Time Statistics ================" << "\n";
+    cout << "\n";
+    cout << "======================= Time Statistics =======================\n";
     cout << "Computation time: " << compute_time << " seconds" << "\n";
     cout << "Total time: " << compute_time + init_time << " seconds" << "\n";
   }
