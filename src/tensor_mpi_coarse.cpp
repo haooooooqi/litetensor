@@ -238,8 +238,8 @@ void CoarseTensor::scatter_partition(Partitioner &partitioner, Config &config) {
   end_rows = vector<uint64_t>(3);
   num_rows = vector<uint64_t>(3);
 
-  uint64_t* global_start_ptr = nullptr;
-  uint64_t* global_end_ptr = nullptr;
+  uint64_t* global_start_ptr = NULL;
+  uint64_t* global_end_ptr = NULL;
 
   for (int m = 0; m < 3; m++) {
     if (proc_id == 0) {
