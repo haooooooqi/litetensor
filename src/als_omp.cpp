@@ -14,7 +14,7 @@ void OMPALSSolver::mttkrp_MA(RawTensor& tensor, Factor& factor, uint64_t mode) {
   // Initialize MA to 0s, very important
   factor.MA.setZero();
 
-  #pragma omp parallel for schedule(dynamic, 16)
+  #pragma omp parallel for schedule(dynamic, 16) num_threads(factor.num_threads)
   for (uint64_t i = 0; i < tensor.I; i++) {   // Each row of MA(i, :)
     for (uint64_t idx = 0; idx < tensor.indices[mode][i].size(); idx++) {
       uint64_t j = tensor.indices[mode][i][idx] % tensor.J;
@@ -29,7 +29,7 @@ void OMPALSSolver::mttkrp_MA(RawTensor& tensor, Factor& factor, uint64_t mode) {
 void OMPALSSolver::mttkrp_MB(RawTensor& tensor, Factor& factor, uint64_t mode) {
   factor.MB.setZero();
 
-  #pragma omp parallel for schedule(dynamic, 16)
+  #pragma omp parallel for schedule(dynamic, 16) num_threads(factor.num_threads)
   for (uint64_t j = 0; j < tensor.J; j++) {
     for (uint64_t idx = 0; idx < tensor.indices[mode][j].size(); idx++) {
       uint64_t i = tensor.indices[mode][j][idx] % tensor.I;
@@ -44,7 +44,7 @@ void OMPALSSolver::mttkrp_MB(RawTensor& tensor, Factor& factor, uint64_t mode) {
 void OMPALSSolver::mttkrp_MC(RawTensor& tensor, Factor& factor, uint64_t mode) {
   factor.MC.setZero();
 
-  #pragma omp parallel for schedule(dynamic, 4)
+  #pragma omp parallel for schedule(dynamic, 4) num_threads(factor.num_threads)
   for (uint64_t k = 0; k < tensor.K; k++) {
     for (uint64_t idx = 0; idx < tensor.indices[mode][k].size(); idx++) {
       uint64_t i = tensor.indices[mode][k][idx] % tensor.I;
@@ -68,6 +68,7 @@ void OMPALSSolver::normalize(Factor& factor, Mat& M, int iter) {
       factor.lambda(r) = std::max(M.col(r).maxCoeff(), 1.0);
       M.col(r) /= factor.lambda(r);
     }
+//    factor.lambda = M.colwise().maxCoeff();
   }
 }
 
@@ -165,6 +166,9 @@ void OMPALSSolver::als(RawTensor& tensor, Factor& factor, Config& config) {
   int num_threads = config.num_threads;
   int max_iters = config.max_iters;
   double tolerance = config.tolerance;
+
+  // Eigen multi-thread
+  Eigen::setNbThreads(num_threads);
 
   cout << "====================== Decomposing Tensor ======================\n";
   cout << "Max iterations: " << max_iters << "; " <<  "Rank: " << rank << "; ";

@@ -45,10 +45,6 @@ int main(int argc, char** argv) {
     double init_time = duration_cast<dsec>(Clock::now() - init_start).count();
     cout << "Initialization time: " << init_time << " seconds" << "\n\n";
 
-    // Set thread number
-    omp_set_num_threads(config.num_threads);
-    Eigen::setNbThreads(config.num_threads);
-
     OMPALSSolver solver;
 
     high_resolution_clock::time_point compute_start = Clock::now();
