@@ -86,6 +86,8 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
 
   iter_start = Clock::now();
   mttkrp_MA(tensor, factor, 0);
+  factor.MA = factor.MA * V;
+
   // Allgatherv on MA
   MPI_Allgatherv(factor.MA.data(), tensor.counts[0][proc_id], MPI_DOUBLE,
                  factor.A.data(), &tensor.counts[0].front(),
@@ -94,11 +96,13 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   cout << "Process " << proc_id << " Iteration " << iter << " ";
   cout << "A MTTKRP time: " << setw(width) << iter_time << " seconds\n";
 
+  /*
   iter_start = Clock::now();
   factor.A = factor.A * V;
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   cout << "Process " << proc_id << " Iteration " << iter << " ";
   cout << "A Update time: " << setw(width) << iter_time << " seconds\n";
+   */
 
   iter_start = Clock::now();
   normalize(factor, factor.A, iter);
@@ -117,6 +121,8 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
 
   iter_start = Clock::now();
   mttkrp_MB(tensor, factor, 1);
+  factor.MB = factor.MB * V;
+
   // Allgatherv on MB
   MPI_Allgatherv(factor.MB.data(), tensor.counts[1][proc_id], MPI_DOUBLE,
                  factor.B.data(), &tensor.counts[1].front(),
@@ -125,11 +131,13 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   cout << "Process " << proc_id << " Iteration " << iter << " ";
   cout << "B MTTKRP time: " << setw(width) << iter_time << " seconds\n";
 
+  /*
   iter_start = Clock::now();
   factor.B = factor.B * V;
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   cout << "Process " << proc_id << " Iteration " << iter << " ";
   cout << "B Update time: " << setw(width) << iter_time << " seconds\n";
+   */
 
   iter_start = Clock::now();
   normalize(factor, factor.B, iter);
@@ -148,6 +156,14 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
 
   iter_start = Clock::now();
   mttkrp_MC(tensor, factor, 2);
+
+  // Allgatherv on MC_copy, for fitness computation
+  MPI_Allgatherv(factor.MC.data(), tensor.counts[2][proc_id], MPI_DOUBLE,
+                 factor.MC_copy.data(), &tensor.counts[2].front(),
+                 &tensor.disps[2].front(), MPI_DOUBLE, MPI_COMM_WORLD);
+
+  factor.MC = factor.MC * V;
+
   // Allgatherv on MC
   MPI_Allgatherv(factor.MC.data(), tensor.counts[2][proc_id], MPI_DOUBLE,
                  factor.C.data(), &tensor.counts[2].front(),
@@ -158,14 +174,16 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   cout << "C MTTKRP time: " << setw(width) << iter_time << " seconds\n";
 
   // Copy full MC, will used in fitness calculation
-  std::copy(factor.C.data(), factor.C.data() + factor.C.size(),
-            factor.MC_copy.data());
+//  std::copy(factor.C.data(), factor.C.data() + factor.C.size(),
+//            factor.MC_copy.data());
 
+  /*
   iter_start = Clock::now();
   factor.C = factor.C * V;
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   cout << "Process " << proc_id << " Iteration " << iter << " ";
   cout << "C Update time: " << setw(width) << iter_time << " seconds\n";
+   */
 
   iter_start = Clock::now();
   normalize(factor, factor.C, iter);
@@ -238,13 +256,22 @@ void CoarseMPIALSSolver::normalize(CoarseFactor& factor, Mat& M, int iter) {
   uint64_t rank = factor.rank;
 
   if (iter == 0) {   // L2 norm in the first iteration
-    for (uint64_t r = 0; r < rank; r++)
-      M.col(r).normalize();
+//    for (uint64_t r = 0; r < rank; r++)
+//      M.col(r).normalize();
+    M.colwise().normalize();
   } else {           // Max norm for later iterations
+    /*
     for (uint64_t r = 0; r < rank; r++) {
       factor.lambda(r) = std::max(M.col(r).maxCoeff(), 1.0);
       M.col(r) /= factor.lambda(r);
     }
+     */
+    factor.lambda = M.colwise().maxCoeff();
+    for (uint64_t r = 0; r < rank; r++)
+      factor.lambda(r) = std::max(factor.lambda(r), 1.0);
+
+    factor.lambda_inverse = (1 / factor.lambda.array()).matrix();
+    M = M * factor.lambda_inverse.asDiagonal();
   }
 }
 

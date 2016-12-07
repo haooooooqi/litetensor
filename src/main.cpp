@@ -35,7 +35,20 @@ int main(int argc, char** argv) {
 
     tensor.construct_tensor(partitioner, config);
     CoarseMPIALSSolver solver;
+
+    double start_time = MPI_Wtime();
     solver.solve(tensor, config);
+    double end_time = MPI_Wtime();
+    double compute_time = end_time - start_time;
+
+
+    if (proc_id == 0) {
+      cout << "\n";
+      cout << "======================= Time Statistics =======================";
+      cout << "\n";
+    }
+    cout << "Process " << proc_id << " ";
+    cout << "Computation time: " << compute_time << " seconds" << "\n";
 
     MPI_Finalize();
 

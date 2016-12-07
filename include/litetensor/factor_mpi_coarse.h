@@ -26,6 +26,7 @@ struct CoarseFactor {
   Mat ID;              // Identity matrix
 
   Vec lambda;
+  Vec lambda_inverse;
   Vec ones;
 
   double frob_norm;
@@ -67,6 +68,8 @@ struct CoarseFactor {
 
 
     lambda = VectorXd(rank);
+    lambda_inverse = VectorXd(rank);
+
     ones = VectorXd(K).setOnes();
 
     MC_copy = MatrixXd(K, rank);
