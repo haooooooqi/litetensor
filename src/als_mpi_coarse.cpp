@@ -163,16 +163,19 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
 
   iter_start = Clock::now();
   factor.C = factor.C * V;
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   cout << "Process " << proc_id << " Iteration " << iter << " ";
   cout << "C Update time: " << setw(width) << iter_time << " seconds\n";
 
   iter_start = Clock::now();
   normalize(factor, factor.C, iter);
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   cout << "Process " << proc_id << " Iteration " << iter << " ";
   cout << "C Normalize time: " << setw(width) << iter_time << " seconds\n";
 
   iter_start = Clock::now();
   factor.CTC = factor.C.transpose() * factor.C;
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
   cout << "Process " << proc_id << " Iteration " << iter << " ";
   cout << "CTC time: " << setw(width) << iter_time << " seconds\n";
 }
