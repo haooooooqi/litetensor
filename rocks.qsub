@@ -13,3 +13,5 @@ PROGRAM_NAME="./cpd -i $INPUT_FILE -n"
 # Submit the job.  No need to modify this.
 cd $PBS_O_WORKDIR
 mpirun -host $HOSTS -np $NP $PROGRAM_NAME
+mkdir -p outputs
+mv rocks.qsub.* outputs
