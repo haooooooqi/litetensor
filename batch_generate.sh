@@ -1,10 +1,10 @@
-# /usr/bin/env bash
-# generate jobs in batch
+#!/usr/bin/env bash
 
-processes=(1 2 4 8 16) # The number of threads 
-inputs=(benchmark/data/freebase_music.txt) 
+# generate jobs in batch
+processes=(1 2 4 8 16) # The number of threads
+input=benchmark/data/freebase_music.txt
 
 for p in ${processes[@]}
 do
-    ./run_rocks_mpi.sh 1 $p $inputs
+    ./run_rocks_mpi.sh 1 $p $input
 done
