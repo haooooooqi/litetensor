@@ -20,14 +20,15 @@ void Partitioner::print_tensor_stats() {
 
   // Range of each process
   for (int i = 0; i < num_procs; i++) {
-    cout << "Process " << setw(2) << i << " ";
+    cout << "Process " << setw(2) << i << "\n";
     for (int m = 0; m < 3; m++) {
       cout << "Mode " << m;
       cout << " Local nnz: " << setw(9) << proc_nnz[m][i];
       cout << " Start: " << setw(7) << start_indices[m][i];
-      cout << " End: " << setw(7) << end_indices[m][i] << "; ";
+      cout << " End: " << setw(7) << end_indices[m][i];
+      cout << " Rows: " << setw(7) << end_indices[m][i] - start_indices[m][i];
+      cout << ";\n";
     }
-    cout << "\n";
   }
 
 }

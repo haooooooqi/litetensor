@@ -49,15 +49,27 @@ void CoarseMPIALSSolver::als(CoarseTensor& tensor, CoarseFactor& factor,
 
   high_resolution_clock::time_point iter_start;
   double iter_time;
+  double max_time;
+  int width = 8;
 
   for (int iter = 0; iter < max_iters; iter++) {
     iter_start = Clock::now();
     als_iter(tensor, factor, V, iter);
     iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
 
+    MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0,
+               MPI_COMM_WORLD);
+
     fitness = calc_fitness(factor);
-    cout << "Iteration: " << iter + 1 << ", Fitness: " << fitness << ", ";
-    cout << "Process " << proc_id << " Time : " << iter_time << "\n";
+
+    if (proc_id == 0) {
+      cout << "Iteration " << iter << " max time: " << setw(width) << max_time;
+      cout << " seconds; Fitness: " << fitness << "\n";
+    }
+
+
+//    cout << "Iteration: " << iter + 1 << ", Fitness: " << fitness << ", ";
+//    cout << "Process " << proc_id << " Time : " << iter_time << "\n";
 
     if (fitness == 1. || abs(fitness - prev_fitness) < tolerance)
       break;
@@ -80,8 +92,11 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
 
   high_resolution_clock::time_point iter_start;
   double iter_time;
+  double max_time;
 
-  // Update A
+  /*
+   * Iteration A
+   */
   V = (factor.BTB.cwiseProduct(factor.CTC).llt().solve(factor.ID));
 
   iter_start = Clock::now();
@@ -93,30 +108,30 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
                  factor.A.data(), &tensor.counts[0].front(),
                  &tensor.disps[0].front(), MPI_DOUBLE, MPI_COMM_WORLD);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "A MTTKRP time: " << setw(width) << iter_time << " seconds\n";
 
-  /*
-  iter_start = Clock::now();
-  factor.A = factor.A * V;
-  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "A Update time: " << setw(width) << iter_time << " seconds\n";
-   */
+  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (proc_id == 0)
+    cout << "A MTTKRP max time: " << setw(width) << max_time << " seconds; ";
 
   iter_start = Clock::now();
   normalize(factor, factor.A, iter);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "A Normalize time: " << setw(width) << iter_time << " seconds\n";
+
+  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (proc_id == 0)
+    cout << "A normalize max time: " << setw(width) << max_time << " seconds; ";
 
   iter_start = Clock::now();
   factor.ATA = factor.A.transpose() * factor.A;
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "ATA time: " << setw(width) << iter_time << " seconds\n";
 
-  // Update B
+  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (proc_id == 0)
+    cout << "ATA max time: " << setw(width) << max_time << " seconds\n";
+
+  /*
+   * Iteration B
+   */
   V = (factor.ATA.cwiseProduct(factor.CTC).llt().solve(factor.ID));
 
   iter_start = Clock::now();
@@ -128,30 +143,30 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
                  factor.B.data(), &tensor.counts[1].front(),
                  &tensor.disps[1].front(), MPI_DOUBLE, MPI_COMM_WORLD);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "B MTTKRP time: " << setw(width) << iter_time << " seconds\n";
 
-  /*
-  iter_start = Clock::now();
-  factor.B = factor.B * V;
-  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "B Update time: " << setw(width) << iter_time << " seconds\n";
-   */
+  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (proc_id == 0)
+    cout << "B MTTKRP max time: " << setw(width) << max_time << " seconds; ";
 
   iter_start = Clock::now();
   normalize(factor, factor.B, iter);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "B Normalize time: " << setw(width) << iter_time << " seconds\n";
+
+  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (proc_id == 0)
+    cout << "B normalize max time: " << setw(width) << max_time << " seconds; ";
 
   iter_start = Clock::now();
   factor.BTB = factor.B.transpose() * factor.B;
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "BTB time: " << setw(width) << iter_time << " seconds\n";
 
-  // Update C
+  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (proc_id == 0)
+    cout << "BTB max time: " << setw(width) << max_time << " seconds\n";
+
+  /*
+   * Iteration C
+   */
   V = (factor.ATA.cwiseProduct(factor.BTB).llt().solve(factor.ID));
 
   iter_start = Clock::now();
@@ -168,34 +183,27 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   MPI_Allgatherv(factor.MC.data(), tensor.counts[2][proc_id], MPI_DOUBLE,
                  factor.C.data(), &tensor.counts[2].front(),
                  &tensor.disps[2].front(), MPI_DOUBLE, MPI_COMM_WORLD);
-
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "C MTTKRP time: " << setw(width) << iter_time << " seconds\n";
 
-  // Copy full MC, will used in fitness calculation
-//  std::copy(factor.C.data(), factor.C.data() + factor.C.size(),
-//            factor.MC_copy.data());
-
-  /*
-  iter_start = Clock::now();
-  factor.C = factor.C * V;
-  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "C Update time: " << setw(width) << iter_time << " seconds\n";
-   */
+  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (proc_id == 0)
+    cout << "C MTTKRP max time: " << setw(width) << max_time << " seconds; ";
 
   iter_start = Clock::now();
   normalize(factor, factor.C, iter);
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "C Normalize time: " << setw(width) << iter_time << " seconds\n";
+
+  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (proc_id == 0)
+    cout << "C normalize max time: " << setw(width) << max_time << " seconds; ";
 
   iter_start = Clock::now();
   factor.CTC = factor.C.transpose() * factor.C;
   iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "Process " << proc_id << " Iteration " << iter << " ";
-  cout << "CTC time: " << setw(width) << iter_time << " seconds\n";
+
+  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (proc_id == 0)
+    cout << "CTC max time: " << setw(width) << max_time << " seconds\n";
 }
 
 
