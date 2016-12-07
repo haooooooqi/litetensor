@@ -1,6 +1,7 @@
 #include <mpi.h>
 
 #include <chrono>
+#include <iomanip>
 
 #include <litetensor/tensor_mpi_coarse.h>
 #include <litetensor/factor_mpi_coarse.h>
@@ -40,15 +41,6 @@ void CoarseMPIALSSolver::als(CoarseTensor& tensor, CoarseFactor& factor,
   factor.BTB = factor.B.transpose() * factor.B;
   factor.CTC = factor.C.transpose() * factor.C;
 
-  /*
-  if (proc_id == 0) {
-    cout << "Process " << tensor.proc_id << " initial A, B, C:\n";
-    cout << "A: \n" << factor.A << endl;
-    cout << "B: \n" << factor.B << endl;
-    cout << "C: \n" << factor.C << endl;
-  }
-   */
-
   // Intermediate result of pseudo-inverse, a small dense matrix
   Mat V = MatrixXd(rank, rank);
 
@@ -63,15 +55,9 @@ void CoarseMPIALSSolver::als(CoarseTensor& tensor, CoarseFactor& factor,
     als_iter(tensor, factor, V, iter);
     iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
 
-    // Master node checks fitness
     fitness = calc_fitness(factor);
-
-    cout << "From process " << proc_id << " ";
-    cout << "Fitness: " << fitness << "; ";
-    cout << "Iteration time: " << iter_time << "\n";
-
-    if (proc_id == 0)
-      cout << "Iteration: " << iter + 1 << ", Fitness: " << fitness << endl;
+    cout << "Iteration: " << iter + 1 << ", Fitness: " << fitness << ", ";
+    cout << "Process " << proc_id << " Time : " << iter_time << "\n";
 
     if (fitness == 1. || abs(fitness - prev_fitness) < tolerance)
       break;
@@ -84,13 +70,13 @@ void CoarseMPIALSSolver::als(CoarseTensor& tensor, CoarseFactor& factor,
 
 void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
                                   Mat &V, int iter) {
-
   using namespace std;
   using namespace std::chrono;
   typedef std::chrono::high_resolution_clock Clock;
   typedef std::chrono::duration<double> dsec;
 
   int proc_id = tensor.proc_id;
+  int width = 8;
 
   high_resolution_clock::time_point iter_start;
   double iter_time;
@@ -100,59 +86,95 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
 
   iter_start = Clock::now();
   mttkrp_MA(tensor, factor, 0);
-  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "From process " << proc_id << " ";
-  cout << "MTTKRP A time: " << iter_time << " seconds" << std::endl;
-
   // Allgatherv on MA
   MPI_Allgatherv(factor.MA.data(), tensor.counts[0][proc_id], MPI_DOUBLE,
                  factor.A.data(), &tensor.counts[0].front(),
                  &tensor.disps[0].front(), MPI_DOUBLE, MPI_COMM_WORLD);
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "A MTTKRP time: " << setw(width) << iter_time << " seconds\n";
 
+  iter_start = Clock::now();
   factor.A = factor.A * V;
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "A Update time: " << setw(width) << iter_time << " seconds\n";
+
+  iter_start = Clock::now();
   normalize(factor, factor.A, iter);
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "A Normalize time: " << setw(width) << iter_time << " seconds\n";
+
+  iter_start = Clock::now();
   factor.ATA = factor.A.transpose() * factor.A;
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "ATA time: " << setw(width) << iter_time << " seconds\n";
 
   // Update B
   V = (factor.ATA.cwiseProduct(factor.CTC).llt().solve(factor.ID));
 
   iter_start = Clock::now();
   mttkrp_MB(tensor, factor, 1);
-  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "From process " << proc_id << " ";
-  cout << "MTTKRP B time: " << iter_time << " seconds" << std::endl;
-
   // Allgatherv on MB
   MPI_Allgatherv(factor.MB.data(), tensor.counts[1][proc_id], MPI_DOUBLE,
                  factor.B.data(), &tensor.counts[1].front(),
                  &tensor.disps[1].front(), MPI_DOUBLE, MPI_COMM_WORLD);
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "B MTTKRP time: " << setw(width) << iter_time << " seconds\n";
 
+  iter_start = Clock::now();
   factor.B = factor.B * V;
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "B Update time: " << setw(width) << iter_time << " seconds\n";
+
+  iter_start = Clock::now();
   normalize(factor, factor.B, iter);
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "B Normalize time: " << setw(width) << iter_time << " seconds\n";
+
+  iter_start = Clock::now();
   factor.BTB = factor.B.transpose() * factor.B;
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "BTB time: " << setw(width) << iter_time << " seconds\n";
 
   // Update C
   V = (factor.ATA.cwiseProduct(factor.BTB).llt().solve(factor.ID));
 
   iter_start = Clock::now();
   mttkrp_MC(tensor, factor, 2);
-
-  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
-  cout << "From process " << proc_id << " ";
-  cout << "MTTKRP C time: " << iter_time << " seconds" << endl;
-
   // Allgatherv on MC
   MPI_Allgatherv(factor.MC.data(), tensor.counts[2][proc_id], MPI_DOUBLE,
                  factor.C.data(), &tensor.counts[2].front(),
                  &tensor.disps[2].front(), MPI_DOUBLE, MPI_COMM_WORLD);
 
+  iter_time = duration_cast<dsec>(Clock::now() - iter_start).count();
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "C MTTKRP time: " << setw(width) << iter_time << " seconds\n";
+
   // Copy full MC, will used in fitness calculation
   std::copy(factor.C.data(), factor.C.data() + factor.C.size(),
             factor.MC_copy.data());
 
+  iter_start = Clock::now();
   factor.C = factor.C * V;
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "C Update time: " << setw(width) << iter_time << " seconds\n";
+
+  iter_start = Clock::now();
   normalize(factor, factor.C, iter);
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "C Normalize time: " << setw(width) << iter_time << " seconds\n";
+
+  iter_start = Clock::now();
   factor.CTC = factor.C.transpose() * factor.C;
+  cout << "Process " << proc_id << " Iteration " << iter << " ";
+  cout << "CTC time: " << setw(width) << iter_time << " seconds\n";
 }
 
 
