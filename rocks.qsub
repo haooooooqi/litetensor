@@ -1,0 +1,15 @@
+#!/bin/sh
+# Get command line arguments.
+NODES=$1
+PROCESSORS_PER_NODE=$2
+INPUT_FILE=$3
+# Calculate host list.
+HOSTS=`cat $PBS_NODEFILE | sort | uniq | awk -v ppn=$PROCESSORS_PER_NODE '{for(i=0; i<ppn; i++) { print $0; }}' | paste -d, -s`
+# Calculate number of processors.
+NP=$(( NODES * PROCESSORS_PER_NODE ))
+# Program to run with MPI.
+# PROGRAM_NAME="perf stat -e cache-misses -e cache-references ./wire_route -f $INPUT_FILE"
+PROGRAM_NAME="./cpd -i $INPUT_FILE -n"
+# Submit the job.  No need to modify this.
+cd $PBS_O_WORKDIR
+mpirun -host $HOSTS -np $NP $PROGRAM_NAME
