@@ -43,13 +43,12 @@ void Partitioner::partition(Config& config) {
 
   get_dim(fp);
   num_procs = config.num_procs;
-  ave_nnz = nnz / config.num_procs;
   count_slice_nnz(fp);
 
   // Do partition on each mode
-  partition_mode(0);
-  partition_mode(1);
-  partition_mode(2);
+  partition_mode_fine(0);
+  partition_mode_fine(1);
+  partition_mode_fine(2);
 
   // Check correctness in partition
   check_partition();
@@ -117,6 +116,7 @@ void Partitioner::partition_mode(int mode) {
   uint64_t start_idx = 0;
   uint64_t cur_nnz = 0;
   int cur_proc = 0;
+  uint64_t ave_nnz = nnz / num_procs;
 
   for (uint64_t i = 0; i < dim && cur_proc < num_procs; i++) {
     cur_nnz += slice_nnz[mode][i];
@@ -147,6 +147,61 @@ void Partitioner::partition_mode(int mode) {
   end_indices[mode][cur_proc] = dim;
   proc_nnz[mode][cur_proc] = cur_nnz;
 }
+
+
+void Partitioner::partition_mode_fine(int mode) {
+  // Determine mode
+  uint64_t dim = 0;
+  if (mode == 0)
+    dim = I;
+  else if (mode == 1)
+    dim = J;
+  else if (mode == 2)
+    dim = K;
+  else
+    std::cout << "ERROR: mode should be smaller than 3\n";
+
+  uint64_t start_idx = 0;
+  uint64_t cur_nnz = 0;
+  uint64_t rest_nnz = nnz;      // Remaining non-zeros
+  int cur_proc = 0;
+  uint64_t cur_ave_nnz = rest_nnz / (num_procs - cur_proc);
+
+  for (uint64_t i = 0; i < dim && cur_proc < num_procs; i++) {
+    cur_nnz += slice_nnz[mode][i];
+
+    if (i + 1 < dim && cur_nnz + slice_nnz[mode][i+1] > cur_ave_nnz &&
+            cur_proc < num_procs - 1) {
+      uint64_t gap1 = cur_ave_nnz - cur_nnz;
+      uint64_t gap2 = cur_nnz + slice_nnz[mode][i+1] - cur_ave_nnz;
+
+      start_indices[mode][cur_proc] = start_idx;
+      if (gap1 <= gap2) {                        // i || i + 1
+        end_indices[mode][cur_proc] = i + 1;
+        proc_nnz[mode][cur_proc] = cur_nnz;
+      } else {                                   // i, i + 1 || i + 2
+        end_indices[mode][cur_proc] = i + 2;
+        proc_nnz[mode][cur_proc] = cur_nnz + slice_nnz[mode][i+1];
+        i ++;
+      }
+
+      // Update average nnz
+      rest_nnz -= proc_nnz[mode][cur_proc];
+      cur_ave_nnz = rest_nnz / (num_procs - cur_proc - 1);
+
+      start_idx = end_indices[mode][cur_proc];
+      cur_nnz = 0;
+      cur_proc ++;
+    }
+  }
+
+  // Last process
+  start_indices[mode][cur_proc] = start_idx;
+  end_indices[mode][cur_proc] = dim;
+  proc_nnz[mode][cur_proc] = cur_nnz;
+}
+
+
 
 
 bool Partitioner::check_partition() {
@@ -372,4 +427,4 @@ void CoarseTensor::construct_tensor(Partitioner &partitioner, Config &config) {
 }
 
 
-}   // litetensor
+}   // namespace litetensor

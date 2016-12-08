@@ -22,6 +22,12 @@ private:
   // Do partition on each mode
   void partition_mode(int mode);
 
+  // More fine-grained partition
+  void partition_mode_fine(int mode);
+
+  // TODO: Optimal partition
+  void partition_mode_optimal(int mode) {}
+
   // Print tensor statistics
   void print_tensor_stats();
 
@@ -32,7 +38,6 @@ public:
   uint64_t I, J, K;
   uint64_t nnz;
   int num_procs;
-  uint64_t ave_nnz;      // nnz in each process
 
   // Range style: [start, end)
   std::vector<std::vector<uint64_t>> start_indices;  // shape = 3 * num_procs
@@ -82,7 +87,7 @@ struct CoarseTensor {
 
 
 
-}
+}   // namespace litetensor
 
 
 
