@@ -91,6 +91,7 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   iter_start = MPI_Wtime();
   mttkrp_MA(tensor, factor, 0);
   factor.MA = factor.MA * V;
+  normalize(factor, factor.MA, iter, 0);
 
   // Allgatherv on MA
   MPI_Allgatherv(factor.MA.data(), tensor.counts[0][proc_id], MPI_DOUBLE,
@@ -101,14 +102,6 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
   if (proc_id == 0)
     cout << "A MTTKRP max time: " << setw(width) << max_time << " seconds; ";
-
-  iter_start = MPI_Wtime();
-  normalize(factor, factor.A, iter);
-  iter_time = MPI_Wtime() - iter_start;
-
-  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-  if (proc_id == 0)
-    cout << "A normalize max time: " << setw(width) << max_time << " seconds; ";
 
   iter_start = MPI_Wtime();
   factor.ATA = factor.A.transpose() * factor.A;
@@ -126,6 +119,7 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   iter_start = MPI_Wtime();
   mttkrp_MB(tensor, factor, 1);
   factor.MB = factor.MB * V;
+  normalize(factor, factor.MB, iter, 1);
 
   // Allgatherv on MB
   MPI_Allgatherv(factor.MB.data(), tensor.counts[1][proc_id], MPI_DOUBLE,
@@ -136,14 +130,6 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
   if (proc_id == 0)
     cout << "B MTTKRP max time: " << setw(width) << max_time << " seconds; ";
-
-  iter_start = MPI_Wtime();
-  normalize(factor, factor.B, iter);
-  iter_time = MPI_Wtime() - iter_start;
-
-  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-  if (proc_id == 0)
-    cout << "B normalize max time: " << setw(width) << max_time << " seconds; ";
 
   iter_start = MPI_Wtime();
   factor.BTB = factor.B.transpose() * factor.B;
@@ -161,12 +147,13 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   iter_start = MPI_Wtime();
   mttkrp_MC(tensor, factor, 2);
 
-  // Allgatherv on MC_copy, for fitness computation
+  // Allgatherv on MC_copy first, for fitness computation
   MPI_Allgatherv(factor.MC.data(), tensor.counts[2][proc_id], MPI_DOUBLE,
                  factor.MC_copy.data(), &tensor.counts[2].front(),
                  &tensor.disps[2].front(), MPI_DOUBLE, MPI_COMM_WORLD);
 
   factor.MC = factor.MC * V;
+  normalize(factor, factor.MC, iter, 2);
 
   // Allgatherv on MC
   MPI_Allgatherv(factor.MC.data(), tensor.counts[2][proc_id], MPI_DOUBLE,
@@ -177,14 +164,6 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
   if (proc_id == 0)
     cout << "C MTTKRP max time: " << setw(width) << max_time << " seconds; ";
-
-  iter_start = MPI_Wtime();
-  normalize(factor, factor.C, iter);
-  iter_time = MPI_Wtime() - iter_start;
-
-  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-  if (proc_id == 0)
-    cout << "C normalize max time: " << setw(width) << max_time << " seconds; ";
 
   iter_start = MPI_Wtime();
   factor.CTC = factor.C.transpose() * factor.C;
@@ -247,41 +226,61 @@ void CoarseMPIALSSolver::mttkrp_MC(CoarseTensor& tensor, CoarseFactor& factor,
 }
 
 
-
-// Mat M: A/B/C
-void CoarseMPIALSSolver::normalize(CoarseFactor& factor, Mat& M, int iter) {
+// Mat M: MA / MB / MC
+void CoarseMPIALSSolver::normalize(CoarseFactor& factor, Mat& M, int iter,
+                                   int mode) {
+  using namespace std;
   uint64_t rank = factor.rank;
 
+  double start_time;
+  double iter_time;
+  double max_time;
+
+  start_time = MPI_Wtime();
+
   if (iter == 0) {   // L2 norm in the first iteration
-//    for (uint64_t r = 0; r < rank; r++)
-//      M.col(r).normalize();
     M.colwise().normalize();
   } else {           // Max norm for later iterations
-    /*
-    for (uint64_t r = 0; r < rank; r++) {
-      factor.lambda(r) = std::max(M.col(r).maxCoeff(), 1.0);
-      M.col(r) /= factor.lambda(r);
-    }
-     */
-    factor.lambda = M.colwise().maxCoeff();
+    // Step 1: local lambda
+    factor.local_lambda = M.colwise().maxCoeff();
     for (uint64_t r = 0; r < rank; r++)
-      factor.lambda(r) = std::max(factor.lambda(r), 1.0);
+      factor.local_lambda(r) = std::max(factor.local_lambda(r), 1.0);
 
-    factor.lambda_inverse = (1 / factor.lambda.array()).matrix();
+    // Step 2: reduce to get global lambda
+    MPI_Allreduce(factor.local_lambda.data(), factor.global_lambda.data(), rank,
+                  MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
+    factor.lambda_inverse = (1 / factor.global_lambda.array()).matrix();
     M = M * factor.lambda_inverse.asDiagonal();
+  }
+
+  iter_time = MPI_Wtime() - start_time;
+
+  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (factor.proc_id == 0) {
+    string tmp;
+    if (mode == 0)
+      tmp = "A";
+    else if (mode == 1)
+      tmp = "B";
+    else
+      tmp = "C";
+
+    cout << tmp;
+    cout << " normalization max time: " << setw(10) << max_time << " seconds; ";
   }
 }
 
 
 double CoarseMPIALSSolver::calc_kruskal_norm(CoarseFactor& factor) {
   Mat tmp = factor.ATA.cwiseProduct(factor.BTB).cwiseProduct(factor.CTC);
-  Mat res = factor.lambda.transpose() * tmp * factor.lambda;
+  Mat res = factor.global_lambda.transpose() * tmp * factor.global_lambda;
   return *res.data();
 }
 
 double CoarseMPIALSSolver::calc_kruskal_inner(CoarseFactor& factor) {
   Mat tmp = factor.MC_copy.cwiseProduct(factor.C);
-  Mat res = factor.ones.transpose() * tmp * factor.lambda;
+  Mat res = factor.ones.transpose() * tmp * factor.global_lambda;
   return *res.data();
 }
 
@@ -300,5 +299,4 @@ double CoarseMPIALSSolver::calc_fitness(CoarseFactor& factor) {
 
 
 
-
-} // litetensor
+} // namespace litetensor

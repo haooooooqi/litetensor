@@ -25,7 +25,8 @@ struct CoarseFactor {
   Mat ATA, BTB, CTC;   // Shape: (R, R)
   Mat ID;              // Identity matrix
 
-  Vec lambda;
+  Vec local_lambda;
+  Vec global_lambda;
   Vec lambda_inverse;
   Vec ones;
 
@@ -67,7 +68,8 @@ struct CoarseFactor {
                    &tensor.disps[2][0], MPI_DOUBLE, MPI_COMM_WORLD);
 
 
-    lambda = VectorXd(rank);
+    local_lambda = VectorXd(rank);
+    global_lambda = VectorXd(rank);
     lambda_inverse = VectorXd(rank);
 
     ones = VectorXd(K).setOnes();
@@ -84,8 +86,7 @@ struct CoarseFactor {
 };
 
 
-
-}
+} // namespace litetensor
 
 
 #endif //LITETENSOR_FACTOR_MPI_COARSE_H

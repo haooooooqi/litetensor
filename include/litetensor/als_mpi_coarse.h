@@ -26,7 +26,7 @@ private:
   void mttkrp_MC(CoarseTensor& tensor, CoarseFactor& factor, uint64_t mode);
 
   // Normalize factor matrix
-  void normalize(CoarseFactor& factor, Mat& M, int iter);
+  void normalize(CoarseFactor& factor, Mat& M, int iter, int mode);
 
   // Check fitness
   double calc_fitness(CoarseFactor& factor);
