@@ -96,7 +96,7 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   factor.local_ATA = factor.MA.transpose() * factor.MA;
 
   MPI_Allreduce(factor.local_ATA.data(), factor.ATA.data(), rank * rank,
-             MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+             MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
   // Allgatherv on MA
   MPI_Allgatherv(factor.MA.data(), tensor.counts[0][proc_id], MPI_DOUBLE,
@@ -128,7 +128,7 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   factor.local_BTB = factor.MB.transpose() * factor.MB;
 
   MPI_Allreduce(factor.local_BTB.data(), factor.BTB.data(), rank * rank,
-             MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+             MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
   // Allgatherv on MB
   MPI_Allgatherv(factor.MB.data(), tensor.counts[1][proc_id], MPI_DOUBLE,
@@ -166,7 +166,7 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   factor.local_CTC = factor.MC.transpose() * factor.MC;
 
   MPI_Allreduce(factor.local_CTC.data(), factor.CTC.data(), rank * rank,
-                MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+                MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
   // Allgatherv on MC
   MPI_Allgatherv(factor.MC.data(), tensor.counts[2][proc_id], MPI_DOUBLE,
