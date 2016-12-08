@@ -23,6 +23,7 @@ struct CoarseFactor {
   Mat MA, MB, MC;
 
   Mat ATA, BTB, CTC;   // Shape: (R, R)
+  Mat local_ATA, local_BTB, local_CTC;   // Shape: (R, R)
   Mat ID;              // Identity matrix
 
   Vec local_lambda;
@@ -79,6 +80,10 @@ struct CoarseFactor {
     ATA = MatrixXd(rank, rank);
     BTB = MatrixXd(rank, rank);
     CTC = MatrixXd(rank, rank);
+
+    local_ATA = MatrixXd(rank, rank);
+    local_BTB = MatrixXd(rank, rank);
+    local_CTC = MatrixXd(rank, rank);
 
     ID = MatrixXd(rank, rank).setIdentity();
   }
