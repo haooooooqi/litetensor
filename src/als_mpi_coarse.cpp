@@ -108,14 +108,6 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   if (proc_id == 0)
     cout << "A MTTKRP max time: " << setw(width) << max_time << " seconds;\n";
 
-//  iter_start = MPI_Wtime();
-//  factor.ATA = factor.A.transpose() * factor.A;
-//  iter_time = MPI_Wtime() - iter_start;
-
-//  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-//  if (proc_id == 0)
-//    cout << "ATA max time: " << setw(width) << max_time << " seconds\n";
-
   /*
    * Iteration B
    */
@@ -139,14 +131,6 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
   if (proc_id == 0)
     cout << "B MTTKRP max time: " << setw(width) << max_time << " seconds;\n";
-
-//  iter_start = MPI_Wtime();
-//  factor.BTB = factor.B.transpose() * factor.B;
-//  iter_time = MPI_Wtime() - iter_start;
-
-//  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-//  if (proc_id == 0)
-//    cout << "BTB max time: " << setw(width) << max_time << " seconds\n";
 
   /*
    * Iteration C
@@ -177,14 +161,6 @@ void CoarseMPIALSSolver::als_iter(CoarseTensor &tensor, CoarseFactor &factor,
   MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
   if (proc_id == 0)
     cout << "C MTTKRP max time: " << setw(width) << max_time << " seconds;\n";
-
-//  iter_start = MPI_Wtime();
-//  factor.CTC = factor.C.transpose() * factor.C;
-//  iter_time = MPI_Wtime() - iter_start;
-//
-//  MPI_Reduce(&iter_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-//  if (proc_id == 0)
-//    cout << "CTC max time: " << setw(width) << max_time << " seconds\n";
 }
 
 
