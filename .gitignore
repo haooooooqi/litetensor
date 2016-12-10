@@ -3,6 +3,7 @@ benchmark/data/
 build/
 .DS_Store
 
+final
 third-party
 checkpoint
 *.zip

@@ -25,8 +25,10 @@ private:
   // More fine-grained partition
   void partition_mode_fine(int mode);
 
+  void partition_mode_weighted(int mode);
+
   // TODO: Optimal partition
-  void partition_mode_optimal(int mode) {}
+//  void partition_mode_optimal(int mode) {}
 
   // Print tensor statistics
   void print_tensor_stats();
@@ -43,6 +45,7 @@ public:
   std::vector<std::vector<uint64_t>> start_indices;  // shape = 3 * num_procs
   std::vector<std::vector<uint64_t>> end_indices;    // shape = 3 * num_procs
   std::vector<std::vector<uint64_t>> proc_nnz;       // shape = 3 * num_procs
+  std::vector<std::vector<double>> proc_load;        // shape = 3 * num_procs
 
   /*
    * Partition the tensor in each node.

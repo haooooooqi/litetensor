@@ -16,6 +16,7 @@ Config::Config(int argc, char** argv) {
   max_iters = 5;
   num_threads = 1;
   tolerance = 1e-5;
+  use_row_weight = false;
 
   // MPI options
   use_mpi = false;
@@ -24,7 +25,7 @@ Config::Config(int argc, char** argv) {
   // Parse command line arguments
   int opt;
 
-  while ((opt = getopt(argc, argv, "i:t:r:n")) != -1) {
+  while ((opt = getopt(argc, argv, "i:t:r:nw")) != -1) {
     switch (opt) {
       case 'i':
         tensor_file = string(optarg);
@@ -38,6 +39,9 @@ Config::Config(int argc, char** argv) {
       case 'n':
         // This also indicates that we want to use MPI
         use_mpi = true;
+        break;
+      case 'w':
+        use_row_weight = true;
         break;
       case '?':
         if (optopt == 'i')

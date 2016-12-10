@@ -45,10 +45,21 @@ void Partitioner::partition(Config& config) {
   num_procs = config.num_procs;
   count_slice_nnz(fp);
 
+  cout << "======================= Partition statistics ======================";
+  cout << "\n";
+
   // Do partition on each mode
-  partition_mode_fine(0);
-  partition_mode_fine(1);
-  partition_mode_fine(2);
+  if (config.use_row_weight) {
+    partition_mode_weighted(0);
+    partition_mode_weighted(1);
+    partition_mode_weighted(2);
+  } else {
+    partition_mode_fine(0);
+    partition_mode_fine(1);
+    partition_mode_fine(2);
+  }
+
+  cout << "\n";
 
   // Check correctness in partition
   check_partition();
@@ -68,6 +79,7 @@ void Partitioner::count_slice_nnz(FILE* fp) {
   start_indices = vector<vector<uint64_t>>(3, vector<uint64_t>(num_procs));
   end_indices = vector<vector<uint64_t>>(3, vector<uint64_t>(num_procs));
   proc_nnz = vector<vector<uint64_t>>(3, vector<uint64_t>(num_procs));
+  proc_load = vector<vector<double>>(3, vector<double>(num_procs));
 
   slice_nnz = vector<vector<uint64_t>>(3, vector<uint64_t>());
   slice_nnz[0] = vector<uint64_t>(I);
@@ -166,6 +178,7 @@ void Partitioner::partition_mode_fine(int mode) {
   uint64_t rest_nnz = nnz;      // Remaining non-zeros
   int cur_proc = 0;
   uint64_t cur_ave_nnz = rest_nnz / (num_procs - cur_proc);
+  uint64_t max_nnz = 0;
 
   for (uint64_t i = 0; i < dim && cur_proc < num_procs; i++) {
     cur_nnz += slice_nnz[mode][i];
@@ -185,6 +198,8 @@ void Partitioner::partition_mode_fine(int mode) {
         i ++;
       }
 
+      max_nnz = std::max(max_nnz, proc_nnz[mode][cur_proc]);
+
       // Update average nnz
       rest_nnz -= proc_nnz[mode][cur_proc];
       cur_ave_nnz = rest_nnz / (num_procs - cur_proc - 1);
@@ -199,9 +214,105 @@ void Partitioner::partition_mode_fine(int mode) {
   start_indices[mode][cur_proc] = start_idx;
   end_indices[mode][cur_proc] = dim;
   proc_nnz[mode][cur_proc] = cur_nnz;
+
+  max_nnz = std::max(max_nnz, proc_nnz[mode][cur_proc]);
+
+  std::cout << "Max workload of mode " << mode << ": " << max_nnz << "\n";
 }
 
 
+void Partitioner::partition_mode_weighted(int mode) {
+  // Determine mode
+  uint64_t dim = 0;
+  if (mode == 0)
+    dim = I;
+  else if (mode == 1)
+    dim = J;
+  else if (mode == 2)
+    dim = K;
+  else
+    std::cout << "ERROR: mode should be smaller than 3\n";
+
+  uint64_t start_idx = 0;
+
+  uint64_t cur_nnz = 0;
+  double cur_load = 0.0;
+
+  double rest_load = 6 * (double) nnz;          // Remaining workload
+  double ratio = (double) nnz / (double) dim;   // Workload ratio = nnz / rows
+  std::cout << "Workload ratio: " << ratio << "\n";
+
+  int cur_proc = 0;
+  double cur_ave_load = rest_load / (num_procs - cur_proc);
+
+  uint64_t max_nnz = 0;
+
+  for (uint64_t i = 0; i < dim && cur_proc < num_procs; i++) {
+    cur_nnz += slice_nnz[mode][i];
+    cur_load += (5 * slice_nnz[mode][i] + ratio);
+
+    if (i + 1 < dim
+        && cur_load + 5 * slice_nnz[mode][i+1] + ratio > cur_ave_load
+        && cur_proc < num_procs - 1) {
+
+      double gap1 = cur_ave_load - cur_load;
+      double gap2 = cur_load + 5 * slice_nnz[mode][i+1] + ratio - cur_ave_load;
+
+      start_indices[mode][cur_proc] = start_idx;
+
+      if (gap1 <= gap2) {                        // i || i + 1
+        end_indices[mode][cur_proc] = i + 1;
+        proc_nnz[mode][cur_proc] = cur_nnz;
+        proc_load[mode][cur_proc] = cur_load;
+      } else {                                   // i, i + 1 || i + 2
+        end_indices[mode][cur_proc] = i + 2;
+        proc_nnz[mode][cur_proc] = cur_nnz + slice_nnz[mode][i+1];
+        proc_load[mode][cur_proc] = cur_load + 5 * slice_nnz[mode][i+1] + ratio;
+        i ++;
+      }
+
+      max_nnz = std::max(max_nnz, proc_nnz[mode][cur_proc]);
+
+      // Update average nnz
+      rest_load -= proc_load[mode][cur_proc];
+      cur_ave_load = rest_load / (num_procs - cur_proc - 1);
+
+      start_idx = end_indices[mode][cur_proc];
+      cur_nnz = 0;
+      cur_load = 0.0;
+
+      cur_proc ++;
+    }
+  }
+
+  // Last process
+  start_indices[mode][cur_proc] = start_idx;
+  end_indices[mode][cur_proc] = dim;
+  proc_nnz[mode][cur_proc] = cur_nnz;
+  proc_load[mode][cur_proc] = cur_load;
+
+  max_nnz = std::max(max_nnz, proc_nnz[mode][cur_proc]);
+
+  std::cout << "Max workload of mode " << mode << ": " << max_nnz << "\n";
+}
+
+/*
+void Partitioner::partition_mode_optimal(int mode) {
+  using namespace std;
+
+  // Determine mode
+  uint64_t dim = 0;
+  if (mode == 0)
+    dim = I;
+  else if (mode == 1)
+    dim = J;
+  else if (mode == 2)
+    dim = K;
+  else
+    cout << "ERROR: mode should be smaller than 3\n";
+
+}
+ */
 
 
 bool Partitioner::check_partition() {

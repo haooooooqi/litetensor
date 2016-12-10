@@ -20,6 +20,7 @@ public:
   // Options for MPI
   bool use_mpi;
   int num_procs;
+  bool use_row_weight;
 
   Config(int argc, char** argv);
 
