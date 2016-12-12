@@ -13,3 +13,4 @@ $ git clone https://github.com/Martini09/litetensor
 $ cd litetensor; 
 $ ./build.sh     
 ```
+The script will put the executable cpd in current directory.
