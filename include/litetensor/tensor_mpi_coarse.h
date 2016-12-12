@@ -40,6 +40,7 @@ public:
   uint64_t I, J, K;
   uint64_t nnz;
   int num_procs;
+  int num_threads;
 
   // Range style: [start, end)
   std::vector<std::vector<uint64_t>> start_indices;  // shape = 3 * num_procs
@@ -61,6 +62,8 @@ public:
 struct CoarseTensor {
   int proc_id;
   int num_procs;
+  int num_threads;
+
   uint64_t I, J, K;
 
   double frob_norm;

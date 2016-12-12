@@ -170,6 +170,7 @@ void CoarseMPIALSSolver::mttkrp_MA(CoarseTensor& tensor, CoarseFactor& factor,
   // Initialize MA to 0s, very important
   factor.MA.setZero();
 
+  #pragma omp parallel for schedule(dynamic, 16) num_threads(factor.num_threads)
   for (uint64_t i = 0; i < tensor.num_rows[0]; i++) {   // Each row of MA(i, :)
     for (uint64_t idx = 0; idx < tensor.indices[mode][i].size(); idx++) {
       uint64_t j = tensor.indices[mode][i][idx] % tensor.J;
@@ -186,6 +187,7 @@ void CoarseMPIALSSolver::mttkrp_MB(CoarseTensor& tensor, CoarseFactor& factor,
                                    uint64_t mode) {
   factor.MB.setZero();
 
+#pragma omp parallel for schedule(dynamic, 16) num_threads(factor.num_threads)
   for (uint64_t j = 0; j < tensor.num_rows[1]; j++) {
     for (uint64_t idx = 0; idx < tensor.indices[mode][j].size(); idx++) {
       uint64_t i = tensor.indices[mode][j][idx] % tensor.I;
@@ -202,6 +204,7 @@ void CoarseMPIALSSolver::mttkrp_MC(CoarseTensor& tensor, CoarseFactor& factor,
                                    uint64_t mode) {
   factor.MC.setZero();
 
+  #pragma omp parallel for schedule(dynamic, 16) num_threads(factor.num_threads)
   for (uint64_t k = 0; k < tensor.num_rows[2]; k++) {
     for (uint64_t idx = 0; idx < tensor.indices[mode][k].size(); idx++) {
       uint64_t i = tensor.indices[mode][k][idx] % tensor.I;

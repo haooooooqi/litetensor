@@ -15,6 +15,7 @@ void Partitioner::print_tensor_stats() {
 
   cout << "======================= Tensor statistics ======================\n";
   cout << "MPI processes: " << num_procs << "\n";
+  cout << "Threads in each process: " << num_threads << "\n";
   cout << "Shape: " << I << "x" << J << "x" << K << "; ";
   cout << "Non-zeros: " << nnz << "\n";
 
@@ -43,6 +44,7 @@ void Partitioner::partition(Config& config) {
 
   get_dim(fp);
   num_procs = config.num_procs;
+  num_threads = config.num_threads;
   count_slice_nnz(fp);
 
   cout << "======================= Partition statistics ======================";
@@ -382,6 +384,7 @@ void CoarseTensor::scatter_partition(Partitioner &partitioner, Config &config) {
 
   MPI_Comm_rank(MPI_COMM_WORLD, &proc_id);
   num_procs = config.num_procs;
+  num_threads = config.num_threads;
 
   if (proc_id == 0) { // Prepare for parameters
     I = partitioner.I;
