@@ -1,5 +1,5 @@
 # LiteTensor: Parallel and Distributed Sparse Tensor Decomposition 
-Student project for CMU 15418/618 Parallel Computer Architecture and Programming.
+Student project for CMU 15418/618 Parallel Computer Architecture and Programming. This is a toolbox for sparse tensor decomposition. 
 
 ## Dependencies
 * [`OpenMP`](http://www.openmp.org)
