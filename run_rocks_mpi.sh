@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Max allowed nodes
-MAX_ALLOWED_NODES=3
+MAX_ALLOWED_NODES=4
 
 # Each node will use up to 16 cores
-TOTAL_PROCESSORS_PER_NODE=16
+TOTAL_PROCESSORS_PER_NODE=32
 
 # 10 minutes time limit
-WALLTIME=10
+WALLTIME=30
 
 # Ensure 3 arguments for nodes, processors per node, and input file.
 if [ $# -ne 3 ]; then
