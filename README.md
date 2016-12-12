@@ -3,6 +3,7 @@ Student project for CMU 15418/618 Parallel Computer Architecture and Programming
 
 ## Dependencies
 * [`OpenMP`](http://www.openmp.org)
+Usually OpenMP is supported by GCC. 
 * [`OpenMPI`](https://www.open-mpi.org)
 * [`Eigen3`](http://eigen.tuxfamily.org/index.php?title=Main_Page) 
 Download the Eigen3 zip file from http://bitbucket.org/eigen/eigen/get/3.3.1.zip. I put it in inlcude directory, please modify the Eigen directory in CMakeLists. txt if you choose to put it somewhere else.
