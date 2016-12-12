@@ -13,4 +13,13 @@ $ git clone https://github.com/Martini09/litetensor
 $ cd litetensor; 
 $ ./build.sh     
 ```
-The script will put the executable cpd in current directory.
+The script will put the executable cpd in current directory. To test the code in single machine, run:
+```
+# Here '-r' means the rank, '-t' means number of threads you want to use.
+$ ./cpd -i benchmark/data/tiny.txt -r 2 -t 2   
+```
+If you want to run MPI code, run the script run_mpi_rocks.sh (which is derived from 15-618 assignment 4, should work in sun grid engine clusters).
+```
+# '2' means number of nodes, '4' means 4 processors per node
+$ ./run_mpi_rocks.sh 2 4 bechmark/data/tiny.txt   
+```
